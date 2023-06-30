@@ -1,0 +1,102 @@
+#
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+name: CI
+'on':
+  push:
+    tags:
+      - v*
+    branches:
+      - main
+  pull_request: null
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        go-version:
+          - 1.19.x
+        os:
+          - macos-latest
+          - ubuntu-latest
+    name: 'Build/Test (${{ matrix.os}}, Go ${{ matrix.go-version }})'
+    runs-on: '${{ matrix.os }}'
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          version: 3.12.4
+      - name: Install protoc-gen-go
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1
+      - name: Check Protobuf Generation
+        run: |
+          go generate ./...
+          git diff -G'^[^/]' --exit-code
+      - name: Generate all protobufs
+        run: go generate ./...
+      - name: Build all packages
+        run: go build -v ./...
+      - name: Test all packages
+        run: go test -v ./...
+
+  lint:
+    strategy:
+      matrix:
+        go-version:
+          - 1.19.x
+        os:
+          - ubuntu-latest
+    name: 'Lint ${{ matrix.dir }} (${{ matrix.os }}, Go ${{ matrix.go-version }})'
+    runs-on: '${{ matrix.os }}'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3.3.0
+        with:
+          version: latest
+          working-directory: ./
+          args: >
+            -D errcheck -E stylecheck -E goimports -E misspell -E revive -E
+            gofmt -E goimports --exclude-use-default=false --max-same-issues=0
+            --max-issues-per-linter=0 --timeout 2m
+
+  lintc:
+    strategy:
+      matrix:
+        go-version:
+          - 1.19.x
+        os:
+          - ubuntu-latest
+    name: 'Lint CGO (${{ matrix.os}}, Go ${{ matrix.go-version }})'
+    runs-on: '${{ matrix.os }}'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '${{ matrix.go-version }}'
+      - name: Check for CGO Warnings (gcc)
+        run: CGO_CFLAGS=-Werror CC=gcc go build ./...
+      - name: Check for CGO Warnings (clang)
+        run: CGO_CFLAGS=-Werror CC=clang go build ./...
