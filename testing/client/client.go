@@ -18,7 +18,7 @@ package client
 import (
 	"testing"
 
-	td "github.com/google/go-tdx-guest/client"
+	"github.com/google/go-tdx-guest/client"
 	test "github.com/google/go-tdx-guest/testing"
 )
 
@@ -26,18 +26,18 @@ import (
 // appropriate TDX-guest device from the flags passed into "go test".
 //
 // If using a test guest device, this will also produce a fake Device.
-func GetTdxGuest(tcs []test.TestCase, tb testing.TB) td.Device {
+func GetTdxGuest(tcs []test.TestCase, tb testing.TB) client.Device {
 	tb.Helper()
-	if td.UseDefaultTdxGuestDevice() {
+	if client.UseDefaultTdxGuestDevice() {
 		tdxTestDevice, err := test.TcDevice(tcs)
 		if err != nil {
 			tb.Fatalf("failed to create test device: %v", err)
 		}
 		return tdxTestDevice
 	}
-	client, err := td.OpenDevice()
+	client, err := client.OpenDevice()
 	if err != nil {
-		tb.Fatalf("Failed to open TDX guest device: %v", err)
+		tb.Fatalf("failed to open TDX guest device: %v", err)
 	}
 	return client
 }
