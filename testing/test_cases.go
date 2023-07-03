@@ -11,10 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Package testing defines the mock tdx-guest device
 package testing
 
 import (
 	_ "embed"
+
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )

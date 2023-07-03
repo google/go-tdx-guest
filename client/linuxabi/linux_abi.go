@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 // Package linuxabi describes the ABI required for the TDX ioctl commands
 package linuxabi
 
@@ -94,15 +95,6 @@ const (
 	// TdxAttestErrorUnexpected denotes Unexpected error
 	TdxAttestErrorUnexpected = 0x0001
 )
-
-// Array's content is from Intel's SGXDataCenterAttestationPrimitives Library
-func getTdxSgxEcdsaAttestationID() []uint8 {
-	return []uint8{0xe8, 0x6c, 0x04, 0x6e, 0x8c, 0xc4, 0x4d, 0x95, 0x81, 0x73, 0xfc, 0x43, 0xc1, 0xfa, 0x4f, 0x3f}
-}
-
-type tdxUUID struct {
-	data [TdxUUIDSize]uint8
-}
 
 // TdxReportDataABI is Linux's tdx-guest abi for ReportData
 type TdxReportDataABI struct {
