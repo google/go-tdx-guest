@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Package client provides an interface to the Intel TDX guest device commands.
 package client
 
 import (
@@ -68,7 +70,7 @@ func (d *LinuxDevice) Close() error {
 // Ioctl sends a command with its wrapped request and response values to the Linux device.
 func (d *LinuxDevice) Ioctl(command uintptr, req any) (uintptr, error) {
 	if d.fd == -1 {
-		return 0, fmt.Errorf("Intel TDX Guest Device is not open")
+		return 0, fmt.Errorf("intel TDX Guest Device is not open")
 	}
 	switch sreq := req.(type) {
 	case *labi.TdxQuoteReq:

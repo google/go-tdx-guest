@@ -52,7 +52,7 @@ func Match(got error, want string) bool {
 }
 
 // Open changes the mock device's state to open.
-func (d *Device) Open(path string) error {
+func (d *Device) Open(_ string) error {
 	if d.isOpen {
 		return fmt.Errorf("device is already open")
 	}

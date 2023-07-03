@@ -16,8 +16,6 @@
 package testing
 
 import (
-	_ "embed"
-
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
