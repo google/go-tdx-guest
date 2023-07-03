@@ -47,7 +47,6 @@ func initDevice() {
 		panic(err)
 	}
 	device = tdxTestDevice
-	return
 }
 func TestGetReport(t *testing.T) {
 	devMu.Do(initDevice)
