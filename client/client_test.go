@@ -39,23 +39,15 @@ func initDevice() {
 		}
 		tests = append(tests, tc)
 	}
-	// Choose a mock device or a real device depending on the --tdx_guest_device_path flag.
-	if UseDefaultTdxGuestDevice() {
-		tdxTestDevice, err := test.TcDevice(tests)
-		if err != nil {
-			panic(fmt.Sprintf("failed to create test device: %v", err))
-		}
-		if err := tdxTestDevice.Open(defaultTDXDevicePath); err != nil {
-			panic(err)
-		}
-		device = tdxTestDevice
-		return
-	}
-	client, err := OpenDevice()
+	tdxTestDevice, err := test.TcDevice(tests)
 	if err != nil {
+		panic(fmt.Sprintf("failed to create test device: %v", err))
+	}
+	if err := tdxTestDevice.Open(defaultTDXDevicePath); err != nil {
 		panic(err)
 	}
-	device = client
+	device = tdxTestDevice
+	return
 }
 func TestGetReport(t *testing.T) {
 	devMu.Do(initDevice)
