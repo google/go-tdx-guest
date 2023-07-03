@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.19.x
+          - 1.21.x
         os:
           - macos-latest
           - ubuntu-latest
@@ -62,7 +62,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.19.x
+          - 1.21.x
         os:
           - ubuntu-latest
     name: 'Lint ${{ matrix.dir }} (${{ matrix.os }}, Go ${{ matrix.go-version }})'
@@ -86,7 +86,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 1.19.x
+          - 1.21.x
         os:
           - ubuntu-latest
     name: 'Lint CGO (${{ matrix.os}}, Go ${{ matrix.go-version }})'
