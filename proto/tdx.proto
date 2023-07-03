@@ -1,0 +1,165 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+// Package tdx represents a TDX attestation quote.
+package tdx;
+
+option go_package = "github.com/google/go-tdx-guest/proto/tdx";
+
+message QuoteV4 {
+  // Header of quote structure
+  Header header = 1;  // should be 48 bytes
+
+  // TD report by which quote is generated
+  TDQuoteBody td_quote_body = 2;  // should be 584 bytes
+
+  // Size of the Quote Signature Data structure
+  uint32 signed_data_size = 3;
+
+  // Quote Signature Data structure.
+  Ecdsa256BitQuoteV4AuthData signed_data =
+      4;  // The size should be same as signed_data_size
+
+  // Extra bytes included to fill the quote buffer
+  bytes extra_bytes = 5;  // These trailing bytes can be ignored
+}
+
+message Header {
+  // Version 4 supported
+  uint32 version = 1;
+
+  // Type of attestation key used by quoting enclave
+  // Values :
+  // 2 (ECDSA-256-with-P-256 curve)
+  // 3 (ECDSA-384-with-P-384 curve) (Currently not supported)
+  uint32 attestation_key_type = 2;
+
+  // TEE for this attestation
+  // TDX : 0x00000081
+  uint32 tee_type = 3;
+
+  bytes qe_svn = 4;   // should be 2 bytes
+  bytes pce_svn = 5;  // should be 2 bytes
+
+  // Unique vendor id of QE vendor
+  bytes qe_vendor_id = 6;  // should be 16 bytes
+
+  // Custom user defined data
+  bytes user_data = 7;  // should be 20 bytes
+}
+
+message TDQuoteBody {
+  bytes tee_tcb_svn = 1;       // should be 16 bytes
+  bytes mr_seam = 2;           // should be 48 bytes
+  bytes mr_signer_seam = 3;    // should be 48 bytes
+  bytes seam_attributes = 4;   // should be 8 bytes
+  bytes td_attributes = 5;     // should be 8 bytes
+  bytes xfam = 6;              // should be 8 bytes
+  bytes mr_td = 7;             // should be 48 bytes
+  bytes mr_config_id = 8;      // should be 48 bytes
+  bytes mr_owner = 9;          // should be 48 bytes
+  bytes mr_owner_config = 10;  // should be 48 bytes
+  bytes rt_mr0 = 11;           // should be 48 bytes
+  bytes rt_mr1 = 12;           // should be 48 bytes
+  bytes rt_mr2 = 13;           // should be 48 bytes
+  bytes rt_mr3 = 14;           // should be 48 bytes
+  bytes report_data = 15;      // should be 64 bytes
+}
+
+message Ecdsa256BitQuoteV4AuthData {
+  // The ECDSA 256-bit signature.
+  bytes signature = 1;  // should be 64 bytes
+
+  // The ECDSA 256-bit public key of the attestation key.
+  bytes ecdsa_attestation_key = 2;  // should be 64 bytes
+
+  // The certification data.
+  CertificationData certification_data = 3;
+}
+
+message CertificationData {
+  //   Supported values:
+  // - 1 (PCK identifier: PPID in plain text,  CPUSVN and PCESVN)
+  // - 2 (PCK identifier: PPID encrypted using RSA-2048-OAEP, CPUSVN and PCESVN)
+  // - 3 (PCK identifier: PPID encrypted using RSA-3072-OAEP, CPUSVN and PCESVN)
+  // - 4 (PCK Leaf Certificate in plain text,  currently not supported)
+  // - 5 (Concatenated PCK Cert Chain)
+  // - 6 (QE Report Certification Data)
+  // - 7 (PLATFORM_MANIFEST, currently  not supported)
+  uint32 certificate_data_type = 1;
+
+  // Size of Certification Data field
+  uint32 size = 2;
+
+  //   Certification Data Type:
+  // - 1: Byte array that contains concatenation of PPID, CPUSVN,PCESVN (LE),
+  // PCEID (LE).
+  // - 2: Byte array that contains concatenation of PPID encrypted using
+  // RSA-2048-OAEP, CPUSVN, PCESVN (LE), PCEID (LE).
+  // - 3: Byte array that contains concatenation of PPID encrypted using
+  // RSA-3072-OAEP, CPUSVN, PCESVN (LE), PCEID (LE).
+  // - 4: PCK Leaf Certificate
+  // - 5: Concatenated PCK Cert Chain (PEM formatted). PCK LeafCert||
+  // Intermediate CA Cert|| Root CA Cert
+  //- 6: QE Report Certification Data
+  //- 7: PLATFORM_MANIFEST (currently  not supported)
+
+  QEReportCertificationData qe_report_certification_data = 3;
+}
+
+message QEReportCertificationData {
+  EnclaveReport qe_report = 1;
+  bytes qe_report_signature = 2;  // should be 64 bytes
+  QeAuthData qe_auth_data = 3;
+  PCKCertificateChainData pck_certificate_chain_data = 4;
+}
+message PCKCertificateChainData {
+  //   Supported values:
+  // - 1 (PCK identifier: PPID in plain text,  CPUSVN and PCESVN)
+  // - 2 (PCK identifier: PPID encrypted using RSA-2048-OAEP, CPUSVN and PCESVN)
+  // - 3 (PCK identifier: PPID encrypted using RSA-3072-OAEP, CPUSVN and PCESVN)
+  // - 4 (PCK Leaf Certificate in plain text,  currently not supported)
+  // - 5 (Concatenated PCK Cert Chain)
+  // - 6 (QE Report Certification Data)
+  // - 7 (PLATFORM_MANIFEST, currently  not supported)
+  uint32 certificate_data_type = 1;
+
+  // Size of Certification Data field
+  uint32 size = 2;
+  bytes pck_cert_chain = 3;
+}
+
+message QeAuthData {
+  // The parsed data size.
+  uint32 parsed_data_size = 1;  // should be 2 bytes
+  // The data.
+  bytes data = 2;
+}
+
+message EnclaveReport {
+  bytes cpu_svn = 1;       // should be 16 bytes
+  uint32 misc_select = 2;  // should be 4 bytes
+  bytes reserved1 = 3;     // should be 28 bytes
+  bytes attributes = 4;    // should be 16 bytes
+  bytes mr_enclave = 5;    // should be 32 bytes
+  bytes reserved2 = 6;     // should be 32 bytes
+  bytes mr_signer = 7;     // should be 32 bytes
+  bytes reserved3 = 8;     // should be 96 bytes
+  uint32 isv_prod_id = 9;  // should be 2 bytes
+  uint32 isv_svn = 10;     // should be 2 bytes
+  bytes reserved4 = 11;    // should be 60 bytes
+  bytes report_data = 12;  // should be 64 bytes
+}
