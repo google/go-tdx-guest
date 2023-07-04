@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // Package client provides an interface to the Intel TDX guest device commands.
 package client
 
@@ -22,7 +24,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// defaultTdxGuestDevicePath is the platform's usual device path to the SEV guest.
+// defaultTdxGuestDevicePath is the platform's usual device path to the TDX guest.
 const defaultTdxGuestDevicePath = "/dev/tdx-guest"
 
 // LinuxDevice implements the Device interface with Linux ioctls.
