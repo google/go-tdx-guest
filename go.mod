@@ -9,4 +9,7 @@ require (
 	google.golang.org/protobuf v1.31.0
 )
 
-require golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
+require (
+	github.com/google/logger v1.1.1 // indirect
+	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
+)
