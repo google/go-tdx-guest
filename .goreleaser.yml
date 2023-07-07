@@ -10,7 +10,15 @@ builds:
     id: "attest"
     main: ./tools/attest/attest.go
     binary: attest
-    
+    goos:
+      - linux
+#      - windows
+#      - darwin
+    goarch:
+      - amd64
+    id: "check"
+    main: ./tools/check/check.go
+    binary: check
 
 archives:
   - format: tar.gz

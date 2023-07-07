@@ -1,7 +1,8 @@
 # `testdata`
 This folder contains embedded files that serve as sample API responses,
 intended for testing purposes. These responses can be used to stimulate the
-behavior of Intel PCS APIs without actually making network access.
+behavior of Intel PCS APIs without actually making network access. This folder
+also contains a sample TDX quote version 4 which is only used for testing purpose.
 
 
 ## Files

@@ -49,6 +49,51 @@ You can use `GetRawQuote` to get the TDX Quote in byte array format.
 
 Closes the device.
 
+## `verify`
+
+This library will check the signature, certificate chain and basic
+well-formedness properties of an attestation quote. The requirements for quote
+well-formedness come from the [Intel TDX specification](https://cdrdv2.intel.com/v1/dl/getContent/733568),
+and the requirements for certificate well-formedness come from the
+[Intel PCK Certificate specification](https://api.trustedservices.intel.com/documents/Intel_SGX_PCK_Certificate_CRL_Spec-1.5.pdf).
+
+The presence of the PCK Certificate Chain within the input attestation quote is
+expected.
+
+### `func TdxVerify(quote *pb.QuoteV4, options *Options) error`
+
+This function verifies that the attestation has a valid signature and
+certificate chain. It provides an optional verification against the collateral
+obtained from the Intel PCS API and also offers an optional check against
+the certificate revocation list (CRL). By default, the option to verify against
+collaterals and the certificate revocation list(CRL) is disabled. The
+verification using collaterals is based on [Intel PCS API specification](https://api.portal.trustedservices.intel.com/provisioning-certification)
+documentation.
+
+Example expected invocation:
+
+```
+verify.TdxVerify(myAttestation, verify.Options())
+```
+
+#### `Options` type
+
+This type contains four fields:
+
+*   `GetCollateral bool`: if true, then `TdxVerify` will download the collateral
+    from Intel PCS API service and check against collateral obtained.
+    Must be `true` if `CheckRevocations` is true.
+*   `CheckRevocations bool`: if true, then `TdxVerify` will download the
+    certificate revocation list (CRL) from Intel PCS API service and check for
+    revocations.
+*   `Getter HTTPSGetter`: if `nil`, uses `DefaultHTTPSGetter()`.
+    The `HTTPSGetter` interface consists of a single method `Get(url string)
+    (map[string][]string, []byte, error)` that should return the headers and body
+    of the HTTPS response.
+*   `TrustedRoots *x509.CertPool`: if `nil`, uses the library's embedded
+    certificate.
+    Certificate chain verification is performed using trusted roots.
+
 
 ## License
 
