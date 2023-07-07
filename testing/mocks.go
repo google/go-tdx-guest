@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//	http://www.apache.org/licenses/LICENSE-2.0
+//      http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,7 @@ func Match(got error, want string) bool {
 }
 
 // Open changes the mock device's state to open.
-func (d *Device) Open(_ string) error {
+func (d *Device) Open(path string) error {
 	if d.isOpen {
 		return fmt.Errorf("device is already open")
 	}
@@ -68,6 +68,7 @@ func (d *Device) Close() error {
 	d.isOpen = false
 	return nil
 }
+
 func (d *Device) getReport(req *labi.TdxReportReq) (uintptr, error) {
 	tdReportRespI, ok := d.reportResponse[req.ReportData]
 	if !ok {
@@ -81,6 +82,7 @@ func (d *Device) getReport(req *labi.TdxReportReq) (uintptr, error) {
 	req.TdReport = tdReportResp.Resp.Data
 	return esResult, nil
 }
+
 func (d *Device) getQuote(req *labi.TdxQuoteHdr) (uintptr, error) {
 	var report [labi.TdReportSize]byte
 	copy(report[:], req.Data[labi.GetQuotesReqSize+labi.HeaderSize:])
@@ -88,11 +90,13 @@ func (d *Device) getQuote(req *labi.TdxQuoteHdr) (uintptr, error) {
 	if !ok {
 		return 0, fmt.Errorf("test error: no response for %v", report)
 	}
+
 	quoteResp, ok := quoteRespI.(*GetQuoteResponse)
 	if !ok {
 		return 0, fmt.Errorf("test error: incorrect response for %v", quoteRespI)
 	}
 	esResult := uintptr(quoteResp.EsResult)
+
 	msgSize := uint32(quoteResp.Resp.Header.Size)
 	respSize := new(bytes.Buffer)
 	if err := binary.Write(respSize, binary.LittleEndian, msgSize); err != nil {
