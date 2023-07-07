@@ -102,7 +102,7 @@ var (
 	// ErrMissingQeIdentityRootCert error returned when root certificate is missing in issuer chain of QeIdentity
 	ErrMissingQeIdentityRootCert = errors.New("missing root certificate in the issuer chain of QeIdentity")
 	// ErrRootCaCrlExpired error returned when Root CA CRL is expired
-	ErrRootCaCrlExpired = errors.New("Root CA CRL has expired")
+	ErrRootCaCrlExpired = errors.New("root CA CRL has expired")
 	// ErrPCKCrlExpired error returned when PCK CRL is expired
 	ErrPCKCrlExpired = errors.New("PCK CRL has expired")
 	// ErrTcbInfoExpired error returned when tcbInfo response is expired
@@ -138,7 +138,7 @@ var (
 	// ErrIntermediateCaCertExpired error returned when Intermediate CA certificate has expired
 	ErrIntermediateCaCertExpired = errors.New("intermediate CA certificate in PCK certificate chain has expired")
 	// ErrTcbStatus error returned when TCB status is out of date
-	ErrTcbStatus = errors.New("Unable to find latest status of TCB, it is now OutOfDate")
+	ErrTcbStatus = errors.New("unable to find latest status of TCB, it is now OutOfDate")
 	// ErrCertNil error returned when certificate is not provided
 	ErrCertNil = errors.New("certificate is nil")
 	// ErrParentCertNil error returned when parent certificate is not provided
@@ -571,10 +571,7 @@ func verifyCollateral(options *Options) error {
 		}
 	}
 
-	if err := checkCollateralExpiration(collateral, options); err != nil {
-		return err
-	}
-	return nil
+	return checkCollateralExpiration(collateral, options)
 }
 
 func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
@@ -758,10 +755,7 @@ func verifyPCKCertificationChain(options *Options) error {
 		}
 	}
 
-	if err := checkCertificateExpiration(chain); err != nil {
-		return err
-	}
-	return nil
+	return checkCertificateExpiration(chain)
 }
 
 func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate) x509.VerifyOptions {
@@ -1101,10 +1095,7 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 		}
 	}
 
-	if err := verifyQuote(quote, options); err != nil {
-		return err
-	}
-	return nil
+	return verifyQuote(quote, options)
 }
 
 // TdxVerify verifies the protobuf representation of an attestation quote's signature based
