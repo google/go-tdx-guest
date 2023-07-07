@@ -16,8 +16,8 @@
 package trust
 
 import (
+	"context"
 	"fmt"
-	"golang.org/x/net/context"
 	"io"
 	"net/http"
 	"time"
