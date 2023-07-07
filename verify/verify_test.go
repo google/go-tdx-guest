@@ -610,7 +610,7 @@ func TestNegativeCheckQeStatus(t *testing.T) {
 	qeReport := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport()
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 10
-	wantErr := "Unable to find latest status of TCB, it is now OutOfDate"
+	wantErr := "unable to find latest status of TCB, it is now OutOfDate"
 	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err == nil || err.Error() != wantErr {
 		t.Errorf("No matching TCB level: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
