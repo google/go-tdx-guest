@@ -796,14 +796,6 @@ func verifyHash256(quote *pb.QuoteV4) error {
 	return nil
 }
 
-func sgxTcbComponentsSvn(components []pcs.TcbComponent) []byte {
-	result := make([]byte, len(components))
-	for i := range components {
-		result[i] = components[i].Svn
-	}
-	return result
-}
-
 func isSvnHigherOrEqual(svn []byte, components []pcs.TcbComponent) bool {
 	for i := range svn {
 		if svn[i] < components[i].Svn {
