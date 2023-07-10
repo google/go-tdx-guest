@@ -184,6 +184,7 @@ type Options struct {
 
 	chain             *PCKCertificateChain
 	collateral        *Collateral
+	now               time.Time
 	pckCertExtensions *pcs.PckExtensions
 }
 
@@ -471,7 +472,7 @@ func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, e
 }
 
 func checkCollateralExpiration(collateral *Collateral, options *Options) error {
-	currentTime := time.Now()
+	currentTime := options.now
 
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
@@ -511,8 +512,8 @@ func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 	return nil
 }
 
-func checkCertificateExpiration(chain *PCKCertificateChain) error {
-	currentTime := time.Now()
+func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) error {
+	currentTime := options.now
 
 	if currentTime.After(chain.RootCertificate.NotAfter) {
 		return ErrRootCaCertExpired
@@ -755,7 +756,7 @@ func verifyPCKCertificationChain(options *Options) error {
 		}
 	}
 
-	return checkCertificateExpiration(chain)
+	return checkCertificateExpiration(chain, options)
 }
 
 func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate) x509.VerifyOptions {
@@ -1132,6 +1133,9 @@ func TdxVerify(quote *pb.QuoteV4, options *Options) error {
 	options.collateral = collateral
 	options.pckCertExtensions = exts
 	options.chain = chain
+	if options.now.IsZero() {
+		options.now = time.Now()
+	}
 	return verifyEvidence(quote, options)
 }
 
