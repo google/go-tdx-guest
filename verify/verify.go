@@ -178,14 +178,23 @@ type Options struct {
 	GetCollateral bool
 	// Getter takes a URL and returns the body of its contents. By default uses http.Get and returns the header and body
 	Getter trust.HTTPSGetter
+	// Now is the time at which to verify the validity of certificates and collaterals. If unset, uses time.Now().
+	Now time.Time
 	// TrustedRoots specifies the root CertPool to trust when verifying PCK certificate chain.
 	// If nil, embedded certificate will be used
 	TrustedRoots *x509.CertPool
 
 	chain             *PCKCertificateChain
 	collateral        *Collateral
-	now               time.Time
 	pckCertExtensions *pcs.PckExtensions
+}
+
+// DefaultOptions returns a useful default verification option setting
+func DefaultOptions() *Options {
+	return &Options{
+		Getter: trust.DefaultHTTPSGetter(),
+		Now:    time.Now(),
+	}
 }
 
 type tdQuoteBodyOptions struct {
@@ -472,7 +481,7 @@ func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, e
 }
 
 func checkCollateralExpiration(collateral *Collateral, options *Options) error {
-	currentTime := options.now
+	currentTime := options.Now
 
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
@@ -513,7 +522,7 @@ func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 }
 
 func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) error {
-	currentTime := options.now
+	currentTime := options.Now
 
 	if currentTime.After(chain.RootCertificate.NotAfter) {
 		return ErrRootCaCertExpired
@@ -726,7 +735,7 @@ func verifyPCKCertificationChain(options *Options) error {
 		return fmt.Errorf("unable to validate PCK leaf certificate: %v", err)
 	}
 
-	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert)); err != nil {
+	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options)); err != nil {
 		return fmt.Errorf("error verifying PCK Certificate: %v (%v)", err, rootCert.IsCA)
 	}
 
@@ -759,7 +768,7 @@ func verifyPCKCertificationChain(options *Options) error {
 	return checkCertificateExpiration(chain, options)
 }
 
-func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate) x509.VerifyOptions {
+func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate, options *Options) x509.VerifyOptions {
 	if trustedRoots == nil {
 		logger.Warning("Using embedded Intel certificate for TDX attestation root of trust")
 		trustedRoots = x509.NewCertPool()
@@ -771,7 +780,7 @@ func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate
 		intermediates.AddCert(intermediateCert)
 	}
 
-	return x509.VerifyOptions{Roots: trustedRoots, Intermediates: intermediates}
+	return x509.VerifyOptions{Roots: trustedRoots, Intermediates: intermediates, CurrentTime: options.Now}
 }
 
 func verifyHash256(quote *pb.QuoteV4) error {
@@ -993,7 +1002,7 @@ func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, sig
 	if err := validateCertificate(signingCertificate, rootCertificate, signingPhrase); err != nil {
 		return fmt.Errorf("unable to validate signing certificate in the issuer chain: %v", err)
 	}
-	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil)); err != nil {
+	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, options)); err != nil {
 		return fmt.Errorf("unable to verify signing certificate: %v", err)
 	}
 
@@ -1133,8 +1142,8 @@ func TdxVerify(quote *pb.QuoteV4, options *Options) error {
 	options.collateral = collateral
 	options.pckCertExtensions = exts
 	options.chain = chain
-	if options.now.IsZero() {
-		options.now = time.Now()
+	if options.Now.IsZero() {
+		options.Now = time.Now()
 	}
 	return verifyEvidence(quote, options)
 }

@@ -17,6 +17,7 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/hex"
+	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/google/go-tdx-guest/pcs"
 	testcases "github.com/google/go-tdx-guest/testing"
 	"github.com/google/go-tdx-guest/testing/testdata"
+	"github.com/google/logger"
 )
 
 var (
@@ -42,6 +44,11 @@ func setTcbSvnValues(sgxSvn byte, tdxSvn byte, tdxTcbcomponents *[]pcs.TcbCompon
 		sgxComponents[i].Svn = sgxSvn
 		tdxComponents[i].Svn = tdxSvn
 	}
+}
+
+func TestMain(m *testing.M) {
+	logger.Init("VerifyTestLog", false, false, os.Stderr)
+	os.Exit(m.Run())
 }
 
 func TestParsePckChain(t *testing.T) {
@@ -96,7 +103,7 @@ func TestVerifyPckChainWithoutRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := verifyEvidence(quote, &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, now: currentTime}); err != nil {
+	if err := verifyEvidence(quote, &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, Now: currentTime}); err != nil {
 		t.Error(err)
 	}
 }
@@ -110,9 +117,9 @@ func TestNegativeVerifyPckChainWithoutRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantErr := "root CA certificate in PCK certificate chain has expired"
-	if err := verifyEvidence(quote, &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, now: futureTime}); err == nil || err.Error() != wantErr {
-		t.Errorf("Certificates Expired: verifyEvidence() = %v. Want error %v", err, wantErr)
+	wantErr := "error verifying PCK Certificate: x509: certificate has expired or is not yet valid: current time 2053-07-01T01:00:00Z is after 2029-09-20T13:20:31Z (true)"
+	if err := verifyEvidence(quote, &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, Now: futureTime}); err == nil || err.Error() != wantErr {
+		t.Errorf("Certificates Expired: verifyEvidence() = %v. Want error: %v.", err, wantErr)
 	}
 }
 
@@ -127,7 +134,7 @@ func TestVerifyPckLeafCertificate(t *testing.T) {
 	}
 	pckLeafCert := pckChain.PCKCertificate
 	opts := &Options{CheckRevocations: false, GetCollateral: false, TrustedRoots: nil, chain: pckChain}
-	chains, err := pckLeafCert.Verify(x509Options(opts.TrustedRoots, pckChain.IntermediateCertificate))
+	chains, err := pckLeafCert.Verify(x509Options(opts.TrustedRoots, pckChain.IntermediateCertificate, opts))
 
 	if err != nil {
 		t.Fatal(err)
@@ -239,7 +246,7 @@ func TestNegativeValidateX509Certificate(t *testing.T) {
 }
 
 func TestRawQuoteVerifyWithoutCollateral(t *testing.T) {
-	options := &Options{CheckRevocations: false, GetCollateral: false, now: currentTime}
+	options := &Options{CheckRevocations: false, GetCollateral: false, Now: currentTime}
 	if err := RawTdxQuoteVerify(testdata.RawQuote, options); err != nil {
 		t.Error(err)
 	}
@@ -254,7 +261,7 @@ func TestVerifyQuote(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	options := &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, now: currentTime}
+	options := &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, Now: currentTime}
 	if err := verifyQuote(quote, options); err != nil {
 		t.Error(err)
 	}
@@ -316,7 +323,7 @@ func TestNegativeVerification(t *testing.T) {
 			wantErr:     "unable to verify message digest using quote's signature and ecdsa attestation key",
 		},
 	}
-	options := &Options{CheckRevocations: false, GetCollateral: false, TrustedRoots: nil, now: currentTime}
+	options := &Options{CheckRevocations: false, GetCollateral: false, TrustedRoots: nil, Now: currentTime}
 	rawQuote := make([]byte, len(testdata.RawQuote))
 
 	for _, tc := range tests {
@@ -402,7 +409,7 @@ func TestObtainAndVerifyCollateral(t *testing.T) {
 	ca := platformIssuerID
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
 	fmspc := hex.EncodeToString(fmspcBytes)
-	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, now: currentTime}
+	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, Now: currentTime}
 	collateral, err := obtainCollateral(fmspc, ca, options)
 	if err != nil {
 		t.Fatal(err)
@@ -419,7 +426,7 @@ func TestNegativeObtainAndVerifyCollateral(t *testing.T) {
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
 	fmspc := hex.EncodeToString(fmspcBytes)
 
-	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, now: futureTime}
+	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, Now: futureTime}
 	collateral, err := obtainCollateral(fmspc, ca, options)
 	if err != nil {
 		t.Fatal(err)
@@ -699,7 +706,7 @@ func TestValidateCRL(t *testing.T) {
 
 func TestNegativeRawQuoteVerifyWithCollateral(t *testing.T) {
 	getter := testcases.TestGetter
-	options := &Options{CheckRevocations: true, GetCollateral: true, Getter: getter, now: currentTime}
+	options := &Options{CheckRevocations: true, GetCollateral: true, Getter: getter, Now: currentTime}
 	wantErr := "PCS's reported TDX TCB info failed TCB status check: no matching TCB level found"
 	// Due to updated SVN values in the sample response, it will result in TCB status failure,
 	// when compared to the TD Quote Body's TeeTcbSvn value.
