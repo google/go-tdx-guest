@@ -91,7 +91,7 @@ This type contains five fields:
     (map[string][]string, []byte, error)` that should return the headers and body
     of the HTTPS response.
 *   `Now time.Time`: if `nil`, uses `time.Now()`. It is the time at which to verify
-    the validity of certificates and collaterals
+    the validity of certificates and collaterals.
 *   `TrustedRoots *x509.CertPool`: if `nil`, uses the library's embedded
     certificate.
     Certificate chain verification is performed using trusted roots.
