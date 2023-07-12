@@ -134,7 +134,7 @@ func TestVerifyPckLeafCertificate(t *testing.T) {
 	}
 	pckLeafCert := pckChain.PCKCertificate
 	opts := &Options{CheckRevocations: false, GetCollateral: false, TrustedRoots: nil, chain: pckChain}
-	chains, err := pckLeafCert.Verify(x509Options(opts.TrustedRoots, pckChain.IntermediateCertificate, opts))
+	chains, err := pckLeafCert.Verify(x509Options(opts.TrustedRoots, pckChain.IntermediateCertificate, opts.Now))
 
 	if err != nil {
 		t.Fatal(err)

@@ -735,7 +735,7 @@ func verifyPCKCertificationChain(options *Options) error {
 		return fmt.Errorf("unable to validate PCK leaf certificate: %v", err)
 	}
 
-	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options)); err != nil {
+	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options.Now)); err != nil {
 		return fmt.Errorf("error verifying PCK Certificate: %v (%v)", err, rootCert.IsCA)
 	}
 
@@ -768,7 +768,7 @@ func verifyPCKCertificationChain(options *Options) error {
 	return checkCertificateExpiration(chain, options)
 }
 
-func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate, options *Options) x509.VerifyOptions {
+func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate, now time.Time) x509.VerifyOptions {
 	if trustedRoots == nil {
 		logger.Warning("Using embedded Intel certificate for TDX attestation root of trust")
 		trustedRoots = x509.NewCertPool()
@@ -780,7 +780,7 @@ func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate
 		intermediates.AddCert(intermediateCert)
 	}
 
-	return x509.VerifyOptions{Roots: trustedRoots, Intermediates: intermediates, CurrentTime: options.Now}
+	return x509.VerifyOptions{Roots: trustedRoots, Intermediates: intermediates, CurrentTime: now}
 }
 
 func verifyHash256(quote *pb.QuoteV4) error {
@@ -1002,7 +1002,7 @@ func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, sig
 	if err := validateCertificate(signingCertificate, rootCertificate, signingPhrase); err != nil {
 		return fmt.Errorf("unable to validate signing certificate in the issuer chain: %v", err)
 	}
-	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, options)); err != nil {
+	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, options.Now)); err != nil {
 		return fmt.Errorf("unable to verify signing certificate: %v", err)
 	}
 
