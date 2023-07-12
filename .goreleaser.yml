@@ -10,6 +10,8 @@ builds:
     id: "attest"
     main: ./tools/attest/attest.go
     binary: attest
+  - env:
+      - CGO_ENABLED=0
     goos:
       - linux
 #      - windows
