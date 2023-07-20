@@ -151,7 +151,7 @@ func byteCheck(option, field string, size int, given, required []byte) error {
 	}
 
 	if !bytes.Equal(required, given) {
-		return fmt.Errorf("Quote field %s is %s. Expect %s",
+		return fmt.Errorf("quote field %s is %s. Expect %s",
 			field, hex.EncodeToString(given), hex.EncodeToString(required))
 	}
 
@@ -193,12 +193,12 @@ func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
 func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 
 	if !isSvnHigherOrEqual(quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
-		return fmt.Errorf("Tee Tcb security-version number %d is less than the required minimum %d",
+		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
 
 	if !isSvnHigherOrEqual(quote.GetHeader().GetQeSvn(), opts.HeaderOptions.MinimumQeSvn) {
-		return fmt.Errorf("Qe security-version number %d is less than the required minimum %d",
+		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			quote.GetHeader().GetQeSvn(), opts.HeaderOptions.MinimumQeSvn)
 	}
 
