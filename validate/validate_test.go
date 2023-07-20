@@ -133,18 +133,34 @@ func TestTdxAttestation(t *testing.T) {
 			},
 		},
 		{
-			name:  "min version check",
+			name:  "min QE security-version check",
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumQeSvn:  []byte{0x2, 0x2},
-					MinimumPceSvn: []byte{0x2, 0x2},
-				},
-				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					MinimumTeeTcbSvn: []byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+					MinimumQeSvn: []byte{0x2, 0x2},
 				},
 			},
-			wantErr: "Qe security-version number [0 0] is less than the required minimum [2 2]",
+			wantErr: "QE security-version number [0 0] is less than the required minimum [2 2]",
+		},
+		{
+			name:  "min Pce security-version check",
+			quote: quote12345,
+			opts: &Options{
+				HeaderOptions: HeaderOptions{
+					MinimumPceSvn: []byte{0x2, 0x2},
+				},
+			},
+			wantErr: "PCE security-version number [0 0] is less than the required minimum [2 2]",
+		},
+		{
+			name:  "min TEE TCB security-version check",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MinimumTeeTcbSvn: []byte{0x4, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0},
+				},
+			},
+			wantErr: "TEE TCB security-version number [3 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0] is less than the required minimum [4 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0]",
 		},
 	}
 
@@ -198,7 +214,7 @@ func TestTdxAttestation(t *testing.T) {
 			name:    fmt.Sprintf("Test incorrect %s", name),
 			quote:   quote12345,
 			opts:    opts,
-			wantErr: fmt.Sprintf("Quote field %s", name),
+			wantErr: fmt.Sprintf("quote field %s", name),
 		})
 	}
 
