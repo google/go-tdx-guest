@@ -1,0 +1,62 @@
+// Copyright 2023 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+// Package check represents an attestation validation policy.
+package check;
+
+option go_package = "github.com/google/go-tdx-guest/proto/check";
+
+// Policy is a representation of an attestation quote validation policy.
+// Each field corresponds to a field on validate.Options. This format
+// is useful for providing programmatic inputs to the `check` CLI tool.
+message Policy {
+  // HeaderPolicy is representation of Header of an attestation quote validation
+  // policy.
+  HeaderPolicy header_policy = 1;  // should be 20 bytes
+
+  // TDQuoteBodyPolicy is representation of TdQuoteBody of an attestation quote
+  // validation policy.
+  TDQuoteBodyPolicy td_quote_body_policy = 2;  // should be 528 bytes
+}
+
+message HeaderPolicy {
+  bytes minmum_qe_svn = 1;   // should be 2 bytes
+  bytes minimum_pce_svn = 2;  // should be 2 bytes
+
+  // Unique vendor id of QE vendor
+  bytes qe_vendor_id = 3;  // should be 16 bytes
+}
+
+message TDQuoteBodyPolicy {
+  bytes minimum_tee_tcb_svn = 1;      // should be 16 bytes
+  bytes mr_seam = 2;          // should be 48 bytes
+  bytes td_attributes = 3;    // should be 8 bytes
+  bytes xfam = 4;             // should be 8 bytes
+  bytes mr_td = 5;            // should be 48 bytes
+  bytes mr_config_id = 6;     // should be 48 bytes
+  bytes mr_owner = 7;         // should be 48 bytes
+  bytes mr_owner_config = 8;  // should be 48 bytes
+  bytes rt_mr0 = 9;           // should be 48 bytes
+  bytes rt_mr1 = 10;          // should be 48 bytes
+  bytes rt_mr2 = 11;          // should be 48 bytes
+  bytes rt_mr3 = 12;          // should be 48 bytes
+  bytes report_data = 13;     // should be 64 bytes
+}
+
+message Config {
+  // The quote validation policy.
+  Policy policy = 1;
+}

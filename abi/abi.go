@@ -36,31 +36,46 @@ const (
 	AttestationKeyType = 2 // (ECDSA-256-with-P-256 curve)
 	// TeeTDX  for Attestation
 	TeeTDX = 0x00000081
+	// TeeTcbSvnSize is the size of TEE_TCB_SVN field in TdQuoteBody
+	TeeTcbSvnSize = 0x10
+	// MrSeamSize is the size  of MR_SEAM field in TdQuoteBody
+	MrSeamSize = 0x30
+	// TdAttributesSize is the size  of TD_ATTRIBUTES field in TdQuoteBody
+	TdAttributesSize = 0x08
+	// XfamSize is the size of XFAM field in TdQuoteBody
+	XfamSize = 0x08
+	// MrTdSize is the size of MR_TD field in TdQuoteBody
+	MrTdSize = 0x30
+	// MrConfigIDSize is the size of MR_CONFIG_ID field in TdQuoteBody
+	MrConfigIDSize = 0x30
+	// MrOwnerSize is the size of MR_OWNER field in TdQuoteBody
+	MrOwnerSize = 0x30
+	// MrOwnerConfigSize is the size of MR_OWNER_CONFIG field in TdQuoteBody
+	MrOwnerConfigSize = 0x30
+	// RtMr0Size is the size of Runtime extendable measurement register0
+	RtMr0Size = 0x30
+	// RtMr1Size is the size of Runtime extendable measurement register1
+	RtMr1Size = 0x30
+	// RtMr2Size is the size of Runtime extendable measurement register2
+	RtMr2Size = 0x30
+	// RtMr3Size is the size of Runtime extendable measurement register3
+	RtMr3Size = 0x30
+	// ReportDataSize is the size of ReportData field in TdQuoteBody
+	ReportDataSize = 0x40
+	// QeVendorIDSize is the size of QeVendorID field in Header
+	QeVendorIDSize = 0x10
 
-	userDataSize                            = 0x14
-	reportDataSize                          = 0x40
-	qeReportCertificationDataType           = 0x6
-	pckReportCertificationDataType          = 0x5
-	qeReportSize                            = 0x180
-	headerSize                              = 0x30
-	tdQuoteBodySize                         = 0x248
-	qeSvnSize                               = 0x2
-	pceSvnSize                              = 0x2
-	qeVendorIDSize                          = 0x10
-	teeTcbSvnSize                           = 0x10
-	mrSeamSize                              = 0x30
+	userDataSize                   = 0x14
+	qeReportCertificationDataType  = 0x6
+	pckReportCertificationDataType = 0x5
+	qeReportSize                   = 0x180
+	headerSize                     = 0x30
+	tdQuoteBodySize                = 0x248
+	qeSvnSize                      = 0x2
+	pceSvnSize                     = 0x2
+
 	mrSignerSeamSize                        = 0x30
 	seamAttributesSize                      = 0x08
-	tdAttributesSize                        = 0x08
-	xfamSize                                = 0x08
-	mrTdSize                                = 0x30
-	mrConfigIDSize                          = 0x30
-	mrOwnerSize                             = 0x30
-	mrOwnerConfigSize                       = 0x30
-	rtMr0Size                               = 0x30
-	rtMr1Size                               = 0x30
-	rtMr2Size                               = 0x30
-	rtMr3Size                               = 0x30
 	cpuSvnSize                              = 0x10
 	reserved1Size                           = 0x1C
 	attributesSize                          = 0x10
@@ -191,7 +206,7 @@ var (
 	// ErrQeAuthDataNil error returned when QE Auth Data is empty
 	ErrQeAuthDataNil = errors.New("QE AuthData is empty")
 
-	// ErrQeReportNil error returned when QE Report is empty
+	// ErrQeReportNil  error returned when QE Report is empty
 	ErrQeReportNil = errors.New("QE Report is empty")
 
 	// ErrPckCertChainNil error returned when PCK Certificate Chain is empty
@@ -457,8 +472,8 @@ func checkHeader(header *pb.Header) error {
 	if len(header.GetPceSvn()) != pceSvnSize {
 		return fmt.Errorf("pceSvn size is %d bytes. Expected %d bytes", len(header.GetPceSvn()), pceSvnSize)
 	}
-	if len(header.GetQeVendorId()) != qeVendorIDSize {
-		return fmt.Errorf("qeVendorId size is %d bytes. Expected %d bytes", len(header.GetQeVendorId()), qeVendorIDSize)
+	if len(header.GetQeVendorId()) != QeVendorIDSize {
+		return fmt.Errorf("qeVendorId size is %d bytes. Expected %d bytes", len(header.GetQeVendorId()), QeVendorIDSize)
 	}
 	if len(header.GetUserData()) != userDataSize {
 		return fmt.Errorf("user data size is %d bytes. Expected %d bytes", len(header.GetUserData()), userDataSize)
@@ -472,11 +487,11 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 	if tdQuoteBody == nil {
 		return ErrTDQuoteBodyNil
 	}
-	if len(tdQuoteBody.GetTeeTcbSvn()) != teeTcbSvnSize {
-		return fmt.Errorf("teeTcbSvn size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetTeeTcbSvn()), teeTcbSvnSize)
+	if len(tdQuoteBody.GetTeeTcbSvn()) != TeeTcbSvnSize {
+		return fmt.Errorf("teeTcbSvn size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetTeeTcbSvn()), TeeTcbSvnSize)
 	}
-	if len(tdQuoteBody.GetMrSeam()) != mrSeamSize {
-		return fmt.Errorf("mrSeam size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrSeam()), mrSeamSize)
+	if len(tdQuoteBody.GetMrSeam()) != MrSeamSize {
+		return fmt.Errorf("mrSeam size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrSeam()), MrSeamSize)
 	}
 	if len(tdQuoteBody.GetMrSignerSeam()) != mrSignerSeamSize {
 		return fmt.Errorf("mrSignerSeam size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrSignerSeam()), mrSignerSeamSize)
@@ -484,38 +499,38 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 	if len(tdQuoteBody.GetSeamAttributes()) != seamAttributesSize {
 		return fmt.Errorf("seamAttributes size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetSeamAttributes()), seamAttributesSize)
 	}
-	if len(tdQuoteBody.GetTdAttributes()) != tdAttributesSize {
-		return fmt.Errorf("tdAttributes size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetTdAttributes()), tdAttributesSize)
+	if len(tdQuoteBody.GetTdAttributes()) != TdAttributesSize {
+		return fmt.Errorf("tdAttributes size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetTdAttributes()), TdAttributesSize)
 	}
-	if len(tdQuoteBody.GetXfam()) != xfamSize {
-		return fmt.Errorf("xfam size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetXfam()), xfamSize)
+	if len(tdQuoteBody.GetXfam()) != XfamSize {
+		return fmt.Errorf("xfam size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetXfam()), XfamSize)
 	}
-	if len(tdQuoteBody.GetMrTd()) != mrTdSize {
-		return fmt.Errorf("mrTd size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrTd()), mrTdSize)
+	if len(tdQuoteBody.GetMrTd()) != MrTdSize {
+		return fmt.Errorf("mrTd size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrTd()), MrTdSize)
 	}
-	if len(tdQuoteBody.GetMrConfigId()) != mrConfigIDSize {
-		return fmt.Errorf("mrConfigId size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrConfigId()), mrConfigIDSize)
+	if len(tdQuoteBody.GetMrConfigId()) != MrConfigIDSize {
+		return fmt.Errorf("mrConfigId size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrConfigId()), MrConfigIDSize)
 	}
-	if len(tdQuoteBody.GetMrOwner()) != mrOwnerSize {
-		return fmt.Errorf("mrOwner size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwner()), mrOwnerSize)
+	if len(tdQuoteBody.GetMrOwner()) != MrOwnerSize {
+		return fmt.Errorf("mrOwner size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwner()), MrOwnerSize)
 	}
-	if len(tdQuoteBody.GetMrOwnerConfig()) != mrOwnerConfigSize {
-		return fmt.Errorf("mrOwnerConfig size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwnerConfig()), mrOwnerConfigSize)
+	if len(tdQuoteBody.GetMrOwnerConfig()) != MrOwnerConfigSize {
+		return fmt.Errorf("mrOwnerConfig size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwnerConfig()), MrOwnerConfigSize)
 	}
-	if len(tdQuoteBody.GetRtMr0()) != rtMr0Size {
-		return fmt.Errorf("rtMr0 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr0()), rtMr0Size)
+	if len(tdQuoteBody.GetRtMr0()) != RtMr0Size {
+		return fmt.Errorf("rtMr0 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr0()), RtMr0Size)
 	}
-	if len(tdQuoteBody.GetRtMr1()) != rtMr1Size {
-		return fmt.Errorf("rtMr1 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr1()), rtMr1Size)
+	if len(tdQuoteBody.GetRtMr1()) != RtMr1Size {
+		return fmt.Errorf("rtMr1 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr1()), RtMr1Size)
 	}
-	if len(tdQuoteBody.GetRtMr2()) != rtMr2Size {
-		return fmt.Errorf("rtMr2 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr2()), rtMr2Size)
+	if len(tdQuoteBody.GetRtMr2()) != RtMr2Size {
+		return fmt.Errorf("rtMr2 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr2()), RtMr2Size)
 	}
-	if len(tdQuoteBody.GetRtMr3()) != rtMr3Size {
-		return fmt.Errorf("rtMr3 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr3()), rtMr3Size)
+	if len(tdQuoteBody.GetRtMr3()) != RtMr3Size {
+		return fmt.Errorf("rtMr3 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr3()), RtMr3Size)
 	}
-	if len(tdQuoteBody.GetReportData()) != reportDataSize {
-		return fmt.Errorf("reportData size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetReportData()), reportDataSize)
+	if len(tdQuoteBody.GetReportData()) != ReportDataSize {
+		return fmt.Errorf("reportData size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetReportData()), ReportDataSize)
 	}
 	return nil
 }
@@ -541,7 +556,7 @@ func checkQeReport(report *pb.EnclaveReport) error {
 		return ErrQeReportNil
 	}
 	if len(report.GetCpuSvn()) != cpuSvnSize {
-		return fmt.Errorf("cpuSvn size is %d bytes. Expected %d bytes", len(report.GetCpuSvn()), rtMr3Size)
+		return fmt.Errorf("cpuSvn size is %d bytes. Expected %d bytes", len(report.GetCpuSvn()), RtMr3Size)
 	}
 	if len(report.GetReserved1()) != reserved1Size {
 		return fmt.Errorf("reserved1 size is %d bytes. Expected %d bytes", len(report.GetReserved1()), reserved1Size)
@@ -570,8 +585,8 @@ func checkQeReport(report *pb.EnclaveReport) error {
 	if len(report.GetReserved4()) != reserved4Size {
 		return fmt.Errorf("reserved4 size is %d bytes. Expected %d bytes", len(report.GetReserved4()), reserved4Size)
 	}
-	if len(report.GetReportData()) != reportDataSize {
-		return fmt.Errorf("report data size is %d bytes. Expected %d bytes", len(report.GetReportData()), reportDataSize)
+	if len(report.GetReportData()) != ReportDataSize {
+		return fmt.Errorf("report data size is %d bytes. Expected %d bytes", len(report.GetReportData()), ReportDataSize)
 	}
 	return nil
 }
