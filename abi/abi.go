@@ -206,7 +206,7 @@ var (
 	// ErrQeAuthDataNil error returned when QE Auth Data is empty
 	ErrQeAuthDataNil = errors.New("QE AuthData is empty")
 
-	// ErrQeReportNil  error returned when QE Report is empty
+	// ErrQeReportNil error returned when QE Report is empty
 	ErrQeReportNil = errors.New("QE Report is empty")
 
 	// ErrPckCertChainNil error returned when PCK Certificate Chain is empty

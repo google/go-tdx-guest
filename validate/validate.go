@@ -18,32 +18,26 @@ package validate
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/google/go-tdx-guest/abi"
 	cpb "github.com/google/go-tdx-guest/proto/check"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
+	vr "github.com/google/go-tdx-guest/verify"
 	"go.uber.org/multierr"
-)
-
-var (
-	// ErrOptionsNil error returned when options parameter is empty.
-	ErrOptionsNil = errors.New("options parameter is empty")
 )
 
 // Options represents validation options for a TDX attestation Quote.
 type Options struct {
-	HeaderOptions HeaderOptions
-
+	HeaderOptions      HeaderOptions
 	TdQuoteBodyOptions TdQuoteBodyOptions
 }
 
 // HeaderOptions represents validation options for a TDX attestation Quote Header.
 type HeaderOptions struct {
-	// MinimumQeSvn is the minimum QE security version number.
+	// MinimumQeSvn is the minimum QE security version number. Must be nil or 2 bytes long. Not checked if nil.
 	MinimumQeSvn []byte
-	// MinimumPceSvn is the minimum PCE security version number.
+	// MinimumPceSvn is the minimum PCE security version number. Must be nil or 2bytes long. Not checked if nil.
 	MinimumPceSvn []byte
 	// QeVendorID is the expected QE_VENDOR_ID field. Must be nil or 16 bytes long. Not checked if nil.
 	QeVendorID []byte
@@ -51,7 +45,7 @@ type HeaderOptions struct {
 
 // TdQuoteBodyOptions represents validation options for a TDX attestation Quote's TD Quote body.
 type TdQuoteBodyOptions struct {
-	// MinimumTeeTcbSvn is the minimum TEE_TCB security version number.
+	// MinimumTeeTcbSvn is the minimum TEE_TCB security version number. Must be nil or 16 bytes long. Not checked if nil.
 	MinimumTeeTcbSvn []byte
 	// MrSeam is the expected MR_SEAM field. Must be nil or 48 bytes long. Not checked if nil.
 	MrSeam []byte
@@ -83,7 +77,6 @@ func lengthCheck(name string, length int, value []byte) error {
 	if value != nil && len(value) != length {
 		return fmt.Errorf("option %q length is %d. Want %d", name, len(value), length)
 	}
-
 	return nil
 }
 
@@ -109,13 +102,11 @@ func checkOptionsLengths(opts *Options) error {
 func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
 
 	opts := &Options{
-
 		HeaderOptions: HeaderOptions{
 			MinimumQeSvn:  policy.GetHeaderPolicy().GetMinmumQeSvn(),
 			MinimumPceSvn: policy.GetHeaderPolicy().GetMinimumPceSvn(),
 			QeVendorID:    policy.GetHeaderPolicy().GetQeVendorId(),
 		},
-
 		TdQuoteBodyOptions: TdQuoteBodyOptions{
 			MinimumTeeTcbSvn: policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
 			MrSeam:           policy.GetTdQuoteBodyPolicy().GetMrSeam(),
@@ -132,34 +123,27 @@ func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
 			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
 		},
 	}
-
 	if err := checkOptionsLengths(opts); err != nil {
 		return nil, err
 	}
-
 	return opts, nil
 }
 
 func byteCheck(option, field string, size int, given, required []byte) error {
-
 	if len(required) == 0 {
 		return nil
 	}
-
 	if len(required) != size {
 		return fmt.Errorf("option %v must be nil or %d bytes", option, size)
 	}
-
 	if !bytes.Equal(required, given) {
 		return fmt.Errorf("quote field %s is %s. Expect %s",
 			field, hex.EncodeToString(given), hex.EncodeToString(required))
 	}
-
 	return nil
 }
 
 func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
-
 	return multierr.Combine(
 		byteCheck("MrSeam", "MR_SEAM", abi.MrSeamSize, quote.GetTdQuoteBody().GetMrSeam(), opts.TdQuoteBodyOptions.MrSeam),
 		byteCheck("TdAttributes", "TD_ATTRIBUTES", abi.TdAttributesSize, quote.GetTdQuoteBody().GetTdAttributes(), opts.TdQuoteBodyOptions.TdAttributes),
@@ -191,51 +175,41 @@ func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
 }
 
 func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
-
 	if !isSvnHigherOrEqual(quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
-
 	if !isSvnHigherOrEqual(quote.GetHeader().GetQeSvn(), opts.HeaderOptions.MinimumQeSvn) {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			quote.GetHeader().GetQeSvn(), opts.HeaderOptions.MinimumQeSvn)
 	}
-
 	if !isSvnHigherOrEqual(quote.GetHeader().GetPceSvn(), opts.HeaderOptions.MinimumPceSvn) {
 		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
 			quote.GetHeader().GetPceSvn(), opts.HeaderOptions.MinimumPceSvn)
 	}
-
 	return nil
 }
 
 // TdxAttestation validates fields of the protobuf representation of an attestation Quote against
 // expectations. Does not check the attestation certificates or signature.
 func TdxAttestation(quote *pb.QuoteV4, options *Options) error {
-
 	if options == nil {
-		return ErrOptionsNil
+		return vr.ErrOptionsNil
 	}
-
 	if err := abi.CheckQuoteV4(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
-
 	return multierr.Combine(
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
 	)
-
 }
 
 // RawTdxQuoteValidate checks the raw bytes representation of an attestation quote.
 func RawTdxQuoteValidate(raw []byte, options *Options) error {
-
 	quote, err := abi.QuoteToProto(raw)
 	if err != nil {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
-
 	return TdxAttestation(quote, options)
 }
