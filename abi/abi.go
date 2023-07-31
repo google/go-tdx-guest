@@ -52,14 +52,8 @@ const (
 	MrOwnerSize = 0x30
 	// MrOwnerConfigSize is the size of MR_OWNER_CONFIG field in TdQuoteBody
 	MrOwnerConfigSize = 0x30
-	// RtMr0Size is the size of Runtime extendable measurement register0
-	RtMr0Size = 0x30
-	// RtMr1Size is the size of Runtime extendable measurement register1
-	RtMr1Size = 0x30
-	// RtMr2Size is the size of Runtime extendable measurement register2
-	RtMr2Size = 0x30
-	// RtMr3Size is the size of Runtime extendable measurement register3
-	RtMr3Size = 0x30
+	// RtmrSize is the size of Runtime extendable measurement register
+	RtmrSize = 0x30
 	// ReportDataSize is the size of ReportData field in TdQuoteBody
 	ReportDataSize = 0x40
 	// QeVendorIDSize is the size of QeVendorID field in Header
@@ -517,17 +511,17 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 	if len(tdQuoteBody.GetMrOwnerConfig()) != MrOwnerConfigSize {
 		return fmt.Errorf("mrOwnerConfig size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwnerConfig()), MrOwnerConfigSize)
 	}
-	if len(tdQuoteBody.GetRtMr0()) != RtMr0Size {
-		return fmt.Errorf("rtMr0 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr0()), RtMr0Size)
+	if len(tdQuoteBody.GetRtMr0()) != RtmrSize {
+		return fmt.Errorf("rtMr0 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr0()), RtmrSize)
 	}
-	if len(tdQuoteBody.GetRtMr1()) != RtMr1Size {
-		return fmt.Errorf("rtMr1 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr1()), RtMr1Size)
+	if len(tdQuoteBody.GetRtMr1()) != RtmrSize {
+		return fmt.Errorf("rtMr1 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr1()), RtmrSize)
 	}
-	if len(tdQuoteBody.GetRtMr2()) != RtMr2Size {
-		return fmt.Errorf("rtMr2 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr2()), RtMr2Size)
+	if len(tdQuoteBody.GetRtMr2()) != RtmrSize {
+		return fmt.Errorf("rtMr2 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr2()), RtmrSize)
 	}
-	if len(tdQuoteBody.GetRtMr3()) != RtMr3Size {
-		return fmt.Errorf("rtMr3 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr3()), RtMr3Size)
+	if len(tdQuoteBody.GetRtMr3()) != RtmrSize {
+		return fmt.Errorf("rtMr3 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr3()), RtmrSize)
 	}
 	if len(tdQuoteBody.GetReportData()) != ReportDataSize {
 		return fmt.Errorf("reportData size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetReportData()), ReportDataSize)
@@ -556,7 +550,7 @@ func checkQeReport(report *pb.EnclaveReport) error {
 		return ErrQeReportNil
 	}
 	if len(report.GetCpuSvn()) != cpuSvnSize {
-		return fmt.Errorf("cpuSvn size is %d bytes. Expected %d bytes", len(report.GetCpuSvn()), RtMr3Size)
+		return fmt.Errorf("cpuSvn size is %d bytes. Expected %d bytes", len(report.GetCpuSvn()), cpuSvnSize)
 	}
 	if len(report.GetReserved1()) != reserved1Size {
 		return fmt.Errorf("reserved1 size is %d bytes. Expected %d bytes", len(report.GetReserved1()), reserved1Size)

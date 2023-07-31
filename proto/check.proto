@@ -33,8 +33,8 @@ message Policy {
 }
 
 message HeaderPolicy {
-  bytes minmum_qe_svn = 1;   // should be 2 bytes
-  bytes minimum_pce_svn = 2;  // should be 2 bytes
+  uint32 minmum_qe_svn = 1; 
+  uint32 minimum_pce_svn = 2;
 
   // Unique vendor id of QE vendor
   bytes qe_vendor_id = 3;  // should be 16 bytes
@@ -49,11 +49,8 @@ message TDQuoteBodyPolicy {
   bytes mr_config_id = 6;     // should be 48 bytes
   bytes mr_owner = 7;         // should be 48 bytes
   bytes mr_owner_config = 8;  // should be 48 bytes
-  bytes rt_mr0 = 9;           // should be 48 bytes
-  bytes rt_mr1 = 10;          // should be 48 bytes
-  bytes rt_mr2 = 11;          // should be 48 bytes
-  bytes rt_mr3 = 12;          // should be 48 bytes
-  bytes report_data = 13;     // should be 64 bytes
+  repeated bytes rtmr = 9; // should be 48 bytes
+  bytes report_data = 10;     // should be 64 bytes
 }
 
 message Config {

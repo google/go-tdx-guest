@@ -91,7 +91,7 @@ func TestInvalidConversionsToAbiBytes(t *testing.T) {
 		"header invalid: version 1 not supported",
 		"header invalid: attestation key type not supported",
 		"header invalid: TEE type is not TDX",
-		"QE Report invalid: cpuSvn size is 0 bytes. Expected 48 bytes",
+		"QE Report invalid: cpuSvn size is 0 bytes. Expected 16 bytes",
 	}
 	if _, err := QuoteToAbiBytes(&pb.QuoteV4{}); err == nil || err.Error() != expectedErrors[0] {
 		t.Errorf("error found: %v, want error: %s", err, expectedErrors[0])

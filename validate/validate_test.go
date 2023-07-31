@@ -15,7 +15,6 @@
 package validate
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
@@ -26,20 +25,19 @@ import (
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
 
-func convert(a []byte) []byte {
+func convert(a []byte, x byte) []byte {
 	for i := range a {
-		a[i] = 1
+		a[i] = x
 	}
 	return a
 }
 
 func TestTdxAttestation(t *testing.T) {
-
 	if err := TdxAttestation(nil, nil); err != vr.ErrOptionsNil {
 		t.Error(err)
 	}
-	qeSvn := []byte{0x0, 0x0}
-	pceSvn := []byte{0x0, 0x0}
+	qeSvn := uint32(0)
+	pceSvn := uint32(0)
 	qeVendorID := []byte{0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0xa, 0xd, 0xb3, 0x95, 0x7f, 0x6, 0x7}
 	teeTcbSvn := []byte{0x3, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
 	mrSeam := []byte{0x2f, 0xd2, 0x79, 0xc1, 0x61, 0x64, 0xa9, 0x3d, 0xd5, 0xbf, 0x37, 0x3d, 0x83, 0x43, 0x28, 0xd4,
@@ -80,6 +78,14 @@ func TestTdxAttestation(t *testing.T) {
 		result := make([]byte, 64)
 		copy(result[:], front)
 		return result
+	}
+
+	make2darray := func(size int) [][]byte {
+		a := make([][]byte, 4)
+		for i := range a {
+			a[i] = make([]byte, size)
+		}
+		return a
 	}
 
 	nonce12345 := mknonce([]byte{1, 2, 3, 4, 5})
@@ -123,10 +129,7 @@ func TestTdxAttestation(t *testing.T) {
 					MrConfigID:       mrConfigID,
 					MrOwner:          mrOwner,
 					MrOwnerConfig:    mrOwnerConfig,
-					RtMr0:            rtmr0,
-					RtMr1:            rtmr1,
-					RtMr2:            rtmr2,
-					RtMr3:            rtmr3,
+					Rtmr:             [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
 					ReportData:       reportData,
 				},
 			},
@@ -136,20 +139,20 @@ func TestTdxAttestation(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumQeSvn: []byte{0x2, 0x2},
+					MinimumQeSvn: uint32(2),
 				},
 			},
-			wantErr: "QE security-version number [0 0] is less than the required minimum [2 2]",
+			wantErr: "QE security-version number 0 is less than the required minimum 2",
 		},
 		{
 			name:  "min Pce security-version check",
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumPceSvn: []byte{0x2, 0x2},
+					MinimumPceSvn: uint32(2),
 				},
 			},
-			wantErr: "PCE security-version number [0 0] is less than the required minimum [2 2]",
+			wantErr: "PCE security-version number 0 is less than the required minimum 2",
 		},
 		{
 			name:  "min TEE TCB security-version check",
@@ -161,60 +164,101 @@ func TestTdxAttestation(t *testing.T) {
 			},
 			wantErr: "TEE TCB security-version number [3 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0] is less than the required minimum [4 0 4 0 0 0 0 0 0 0 0 0 0 0 0 0]",
 		},
-	}
-
-	numByteMatchFields := 13
-
-	for i := 0; i < numByteMatchFields; i++ {
-		opts := &Options{}
-		var name string
-		switch i {
-		case 0:
-			name = "MR_SEAM"
-			opts.TdQuoteBodyOptions.MrSeam = make([]byte, abi.MrSeamSize)
-		case 1:
-			name = "TD_ATTRIBUTES"
-			opts.TdQuoteBodyOptions.TdAttributes = make([]byte, abi.TdAttributesSize)
-		case 2:
-			name = "XFAM"
-			opts.TdQuoteBodyOptions.Xfam = make([]byte, abi.XfamSize)
-		case 3:
-			name = "MR_TD"
-			opts.TdQuoteBodyOptions.MrTd = make([]byte, abi.MrTdSize)
-		case 4:
-			name = "MR_CONFIG_ID"
-			opts.TdQuoteBodyOptions.MrConfigID = convert(make([]byte, abi.MrConfigIDSize))
-		case 5:
-			name = "MR_OWNER"
-			opts.TdQuoteBodyOptions.MrOwner = convert(make([]byte, abi.MrOwnerSize))
-		case 6:
-			name = "MR_OWNER_CONFIG"
-			opts.TdQuoteBodyOptions.MrOwnerConfig = convert(make([]byte, abi.MrOwnerConfigSize))
-		case 7:
-			name = "RT_MR0"
-			opts.TdQuoteBodyOptions.RtMr0 = make([]byte, abi.RtMr0Size)
-		case 8:
-			name = "RT_MR1"
-			opts.TdQuoteBodyOptions.RtMr1 = make([]byte, abi.RtMr1Size)
-		case 9:
-			name = "RT_MR2"
-			opts.TdQuoteBodyOptions.RtMr2 = make([]byte, abi.RtMr2Size)
-		case 10:
-			name = "RT_MR3"
-			opts.TdQuoteBodyOptions.RtMr3 = convert(make([]byte, abi.RtMr3Size))
-		case 11:
-			name = "REPORT_DATA"
-			opts.TdQuoteBodyOptions.ReportData = make([]byte, abi.ReportDataSize)
-		case 12:
-			name = "QE_VENDOR_ID"
-			opts.HeaderOptions.QeVendorID = make([]byte, abi.QeVendorIDSize)
-		}
-		tests = append(tests, testCase{
-			name:    fmt.Sprintf("Test incorrect %s", name),
-			quote:   quote12345,
-			opts:    opts,
-			wantErr: fmt.Sprintf("quote field %s", name),
-		})
+		{
+			name:  "Test incorrect MR_SEAM",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MrSeam: make([]byte, abi.MrSeamSize),
+				},
+			},
+			wantErr: "quote field MR_SEAM",
+		},
+		{
+			name:  "Test incorrect TD_ATTRIBUTES",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					TdAttributes: make([]byte, abi.TdAttributesSize),
+				},
+			},
+			wantErr: "quote field TD_ATTRIBUTES",
+		},
+		{
+			name:  "Test incorrect XFAM",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					Xfam: make([]byte, abi.XfamSize),
+				},
+			},
+			wantErr: "quote field XFAM",
+		},
+		{
+			name:  "Test incorrect MR_TD",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MrTd: make([]byte, abi.MrTdSize),
+				},
+			},
+			wantErr: "quote field MR_TD",
+		},
+		{
+			name:  "Test incorrect MR_CONFIG_ID",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MrConfigID: convert(make([]byte, abi.MrConfigIDSize), 1),
+				},
+			},
+			wantErr: "quote field MR_CONFIG_ID",
+		},
+		{
+			name:  "Test incorrect MR_OWNER",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MrOwner: convert(make([]byte, abi.MrOwnerSize), 1),
+				},
+			},
+			wantErr: "quote field MR_OWNER",
+		},
+		{
+			name:  "Test incorrect MR_OWNER_CONFIG",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MrOwnerConfig: convert(make([]byte, abi.MrOwnerConfigSize), 1),
+				},
+			},
+			wantErr: "quote field MR_OWNER_CONFIG",
+		},
+		{name: "Test incorrect RTMR",
+			quote: quote12345,
+			opts: &Options{TdQuoteBodyOptions: TdQuoteBodyOptions{
+				Rtmr: make2darray(abi.RtmrSize),
+			},
+			},
+			wantErr: "quote field RTMR",
+		},
+		{
+			name:  "Test incorrect REPORT_DATA",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					ReportData: make([]byte, abi.ReportDataSize),
+				},
+			},
+			wantErr: "quote field REPORT_DATA",
+		},
+		{
+			name:  "Test incorrect QE_VENDOR_ID",
+			quote: quote12345,
+			opts: &Options{
+				HeaderOptions: HeaderOptions{QeVendorID: make([]byte, abi.QeVendorIDSize)},
+			},
+			wantErr: "quote field QE_VENDOR_ID"},
 	}
 
 	for _, tc := range tests {
