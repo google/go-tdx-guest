@@ -132,7 +132,7 @@ func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
 	return opts, nil
 }
 
-func byteCheckRtmr(option, field string, size int, given, required [][]byte) error {
+func byteCheckRtmr(field string, size int, given, required [][]byte) error {
 	if len(required) == 0 {
 		return nil
 	}
@@ -176,7 +176,7 @@ func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
 		byteCheck("MrConfigID", "MR_CONFIG_ID", abi.MrConfigIDSize, quote.GetTdQuoteBody().GetMrConfigId(), opts.TdQuoteBodyOptions.MrConfigID),
 		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, quote.GetTdQuoteBody().GetMrOwner(), opts.TdQuoteBodyOptions.MrOwner),
 		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, quote.GetTdQuoteBody().GetMrOwnerConfig(), opts.TdQuoteBodyOptions.MrOwnerConfig),
-		byteCheckRtmr("Rtmr", "RTMR", abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmr),
+		byteCheckRtmr("RTMR", abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmr),
 		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, quote.GetTdQuoteBody().GetReportData(), opts.TdQuoteBodyOptions.ReportData),
 		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, quote.GetHeader().GetQeVendorId(), opts.HeaderOptions.QeVendorID),
 	)
