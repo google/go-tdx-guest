@@ -36,8 +36,8 @@ func TestTdxAttestation(t *testing.T) {
 	if err := TdxAttestation(nil, nil); err != vr.ErrOptionsNil {
 		t.Error(err)
 	}
-	qeSvn := uint32(0)
-	pceSvn := uint32(0)
+	qeSvn := uint16(0)
+	pceSvn := uint16(0)
 	qeVendorID := []byte{0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0xa, 0xd, 0xb3, 0x95, 0x7f, 0x6, 0x7}
 	teeTcbSvn := []byte{0x3, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
 	mrSeam := []byte{0x2f, 0xd2, 0x79, 0xc1, 0x61, 0x64, 0xa9, 0x3d, 0xd5, 0xbf, 0x37, 0x3d, 0x83, 0x43, 0x28, 0xd4,
@@ -129,7 +129,7 @@ func TestTdxAttestation(t *testing.T) {
 					MrConfigID:       mrConfigID,
 					MrOwner:          mrOwner,
 					MrOwnerConfig:    mrOwnerConfig,
-					Rtmr:             [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
+					Rtmrs:            [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
 					ReportData:       reportData,
 				},
 			},
@@ -139,7 +139,7 @@ func TestTdxAttestation(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumQeSvn: uint32(2),
+					MinimumQeSvn: uint16(2),
 				},
 			},
 			wantErr: "QE security-version number 0 is less than the required minimum 2",
@@ -149,7 +149,7 @@ func TestTdxAttestation(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumPceSvn: uint32(2),
+					MinimumPceSvn: uint16(2),
 				},
 			},
 			wantErr: "PCE security-version number 0 is less than the required minimum 2",
@@ -234,13 +234,13 @@ func TestTdxAttestation(t *testing.T) {
 			},
 			wantErr: "quote field MR_OWNER_CONFIG",
 		},
-		{name: "Test incorrect RTMR",
+		{name: "Test incorrect RTMRS",
 			quote: quote12345,
 			opts: &Options{TdQuoteBodyOptions: TdQuoteBodyOptions{
-				Rtmr: make2darray(abi.RtmrSize),
+				Rtmrs: make2darray(abi.RtmrSize),
 			},
 			},
-			wantErr: "quote field RTMR",
+			wantErr: "quote field RTMRS",
 		},
 		{
 			name:  "Test incorrect REPORT_DATA",
