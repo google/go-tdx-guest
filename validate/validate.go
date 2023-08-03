@@ -171,8 +171,7 @@ func byteCheck(option, field string, size int, given, required []byte) error {
 }
 
 func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
-	givenRtmr := [][]byte{quote.GetTdQuoteBody().GetRtMr0(), quote.GetTdQuoteBody().GetRtMr1(),
-		quote.GetTdQuoteBody().GetRtMr2(), quote.GetTdQuoteBody().GetRtMr3()}
+	givenRtmr := quote.GetTdQuoteBody().GetRtmrs()
 	return multierr.Combine(
 		byteCheck("MrSeam", "MR_SEAM", abi.MrSeamSize, quote.GetTdQuoteBody().GetMrSeam(), opts.TdQuoteBodyOptions.MrSeam),
 		byteCheck("TdAttributes", "TD_ATTRIBUTES", abi.TdAttributesSize, quote.GetTdQuoteBody().GetTdAttributes(), opts.TdQuoteBodyOptions.TdAttributes),

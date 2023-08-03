@@ -125,15 +125,9 @@ const (
 	tdMrOwnerEnd                            = 0x118
 	tdMrOwnerConfigStart                    = tdMrOwnerEnd
 	tdMrOwnerConfigEnd                      = 0x148
-	tdRtMr0Start                            = tdMrOwnerConfigEnd
-	tdRtMr0End                              = 0x178
-	tdRtMr1Start                            = tdRtMr0End
-	tdRtMr1End                              = 0x1A8
-	tdRtMr2Start                            = tdRtMr1End
-	tdRtMr2End                              = 0x1D8
-	tdRtMr3Start                            = tdRtMr2End
-	tdRtMr3End                              = 0x208
-	tdReportDataStart                       = tdRtMr3End
+	tdRtmrsStart                            = tdMrOwnerConfigEnd
+	tdRtmrsEnd                              = 0x208
+	tdReportDataStart                       = tdRtmrsEnd
 	tdReportDataEnd                         = 0x248
 	signedDataSignatureStart                = 0x00
 	signedDataSignatureEnd                  = 0x40
@@ -182,6 +176,7 @@ const (
 	pckCertChainSizeStart                   = pckCertChainCertificationDataTypeEnd
 	pckCertChainSizeEnd                     = 0x06
 	pckCertChainDataStart                   = pckCertChainSizeEnd
+	rtmrsCount                              = 4
 )
 
 var (
@@ -300,11 +295,14 @@ func tdQuoteBodyToProto(b []uint8) (*pb.TDQuoteBody, error) {
 	report.MrConfigId = data[tdMrConfigIDStart:tdMrConfigIDEnd]
 	report.MrOwner = data[tdMrOwnerStart:tdMrOwnerEnd]
 	report.MrOwnerConfig = data[tdMrOwnerConfigStart:tdMrOwnerConfigEnd]
-	report.RtMr0 = data[tdRtMr0Start:tdRtMr0End]
-	report.RtMr1 = data[tdRtMr1Start:tdRtMr1End]
-	report.RtMr2 = data[tdRtMr2Start:tdRtMr2End]
-	report.RtMr3 = data[tdRtMr3Start:tdRtMr3End]
 	report.ReportData = data[tdReportDataStart:tdReportDataEnd]
+	rtmrsStart := tdRtmrsStart
+	for i := 0; i < rtmrsCount; i++ {
+		rtmrsEnd := rtmrsStart + RtmrSize
+		arr := data[rtmrsStart:rtmrsEnd]
+		report.Rtmrs = append(report.Rtmrs, arr)
+		rtmrsStart += RtmrSize
+	}
 
 	if err := checkTDQuoteBody(report); err != nil {
 		return nil, fmt.Errorf("parsing TD Quote Body failed: %v", err)
@@ -511,20 +509,15 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 	if len(tdQuoteBody.GetMrOwnerConfig()) != MrOwnerConfigSize {
 		return fmt.Errorf("mrOwnerConfig size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwnerConfig()), MrOwnerConfigSize)
 	}
-	if len(tdQuoteBody.GetRtMr0()) != RtmrSize {
-		return fmt.Errorf("rtMr0 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr0()), RtmrSize)
+
+	if len(tdQuoteBody.Rtmrs) != rtmrsCount {
+		return fmt.Errorf("rtmrs count is %d. Expected %d", len(tdQuoteBody.Rtmrs), rtmrsCount)
 	}
-	if len(tdQuoteBody.GetRtMr1()) != RtmrSize {
-		return fmt.Errorf("rtMr1 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr1()), RtmrSize)
-	}
-	if len(tdQuoteBody.GetRtMr2()) != RtmrSize {
-		return fmt.Errorf("rtMr2 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr2()), RtmrSize)
-	}
-	if len(tdQuoteBody.GetRtMr3()) != RtmrSize {
-		return fmt.Errorf("rtMr3 size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetRtMr3()), RtmrSize)
-	}
-	if len(tdQuoteBody.GetReportData()) != ReportDataSize {
-		return fmt.Errorf("reportData size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetReportData()), ReportDataSize)
+
+	for i := 0; i < rtmrsCount; i++ {
+		if len(tdQuoteBody.GetRtmrs()[i]) != RtmrSize {
+			return fmt.Errorf("rtmr%d size is %d bytes. Expected %d bytes", i, len(tdQuoteBody.GetRtmrs()[i]), RtmrSize)
+		}
 	}
 	return nil
 }
@@ -736,10 +729,12 @@ func TdQuoteBodyToAbiBytes(tdQuoteBody *pb.TDQuoteBody) ([]byte, error) {
 	copy(data[tdMrConfigIDStart:tdMrConfigIDEnd], tdQuoteBody.GetMrConfigId())
 	copy(data[tdMrOwnerStart:tdMrOwnerEnd], tdQuoteBody.GetMrOwner())
 	copy(data[tdMrOwnerConfigStart:tdMrOwnerConfigEnd], tdQuoteBody.GetMrOwnerConfig())
-	copy(data[tdRtMr0Start:tdRtMr0End], tdQuoteBody.GetRtMr0())
-	copy(data[tdRtMr1Start:tdRtMr1End], tdQuoteBody.GetRtMr1())
-	copy(data[tdRtMr2Start:tdRtMr2End], tdQuoteBody.GetRtMr2())
-	copy(data[tdRtMr3Start:tdRtMr3End], tdQuoteBody.GetRtMr3())
+	rtmrsStart := tdRtmrsStart
+	for i := 0; i < rtmrsCount; i++ {
+		rtmrsEnd := rtmrsStart + RtmrSize
+		copy(data[rtmrsStart:rtmrsEnd], tdQuoteBody.GetRtmrs()[i])
+		rtmrsStart += RtmrSize
+	}
 	copy(data[tdReportDataStart:tdReportDataEnd], tdQuoteBody.GetReportData())
 	return data, nil
 }
