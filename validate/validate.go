@@ -96,7 +96,7 @@ func checkOptionsLengths(opts *Options) error {
 	return multierr.Combine(
 		lengthCheck("mr_seam", abi.MrSeamSize, opts.TdQuoteBodyOptions.MrSeam),
 		lengthCheck("td_attributes", abi.TdAttributesSize, opts.TdQuoteBodyOptions.TdAttributes),
-		lengthCheck("Xfam", abi.XfamSize, opts.TdQuoteBodyOptions.Xfam),
+		lengthCheck("xfam", abi.XfamSize, opts.TdQuoteBodyOptions.Xfam),
 		lengthCheck("mr_td", abi.MrTdSize, opts.TdQuoteBodyOptions.MrTd),
 		lengthCheck("mr_config_id", abi.MrConfigIDSize, opts.TdQuoteBodyOptions.MrConfigID),
 		lengthCheck("mr_owner", abi.MrOwnerSize, opts.TdQuoteBodyOptions.MrOwner),
