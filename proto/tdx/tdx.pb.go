@@ -239,7 +239,7 @@ type TDQuoteBody struct {
 	MrConfigId     []byte   `protobuf:"bytes,8,opt,name=mr_config_id,json=mrConfigId,proto3" json:"mr_config_id,omitempty"`           // should be 48 bytes
 	MrOwner        []byte   `protobuf:"bytes,9,opt,name=mr_owner,json=mrOwner,proto3" json:"mr_owner,omitempty"`                      // should be 48 bytes
 	MrOwnerConfig  []byte   `protobuf:"bytes,10,opt,name=mr_owner_config,json=mrOwnerConfig,proto3" json:"mr_owner_config,omitempty"` // should be 48 bytes
-	Rtmrs          [][]byte `protobuf:"bytes,11,rep,name=rtmrs,proto3" json:"rtmrs,omitempty"`                                        // should be 48 bytes
+	Rtmrs          [][]byte `protobuf:"bytes,11,rep,name=rtmrs,proto3" json:"rtmrs,omitempty"`                                        // should be 48 * rtmrsCount
 	ReportData     []byte   `protobuf:"bytes,12,opt,name=report_data,json=reportData,proto3" json:"report_data,omitempty"`            // should be 64 bytes
 }
 
