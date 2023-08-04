@@ -79,7 +79,7 @@ type TdQuoteBodyOptions struct {
 	MrOwner []byte
 	// MrOwnerConfig is the expected MR_OWNER_CONFIG field. Must be nil or 48 bytes long. Not checked if nil.
 	MrOwnerConfig []byte
-	// Rtmr is the expected RTMR field. Must be nil or 48 bytes long. Not checked if nil.
+	// Rtmrs is the expected RTMRS field. Must be nil or 48*rtmrsCount. Not checked if nil.
 	Rtmrs [][]byte
 	// ReportData is the expected REPORT_DATA field. Must be nil or 64 bytes long. Not checked if nil.
 	ReportData []byte

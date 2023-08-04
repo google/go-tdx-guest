@@ -49,7 +49,7 @@ message TDQuoteBodyPolicy {
   bytes mr_config_id = 6;         // should be 48 bytes
   bytes mr_owner = 7;             // should be 48 bytes
   bytes mr_owner_config = 8;      // should be 48 bytes
-  repeated bytes rtmrs = 9;       // should be 48 bytes
+  repeated bytes rtmrs = 9;       // should be 48 * rtmrsCount
   bytes report_data = 10;         // should be 64 bytes
 }
 

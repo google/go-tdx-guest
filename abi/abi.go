@@ -509,11 +509,9 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 	if len(tdQuoteBody.GetMrOwnerConfig()) != MrOwnerConfigSize {
 		return fmt.Errorf("mrOwnerConfig size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetMrOwnerConfig()), MrOwnerConfigSize)
 	}
-
-	if len(tdQuoteBody.Rtmrs) != rtmrsCount {
-		return fmt.Errorf("rtmrs count is %d. Expected %d", len(tdQuoteBody.Rtmrs), rtmrsCount)
+	if len(tdQuoteBody.GetRtmrs()) != rtmrsCount {
+		return fmt.Errorf("rtmrs count is %d. Expected %d", len(tdQuoteBody.GetRtmrs()), rtmrsCount)
 	}
-
 	for i := 0; i < rtmrsCount; i++ {
 		if len(tdQuoteBody.GetRtmrs()[i]) != RtmrSize {
 			return fmt.Errorf("rtmr%d size is %d bytes. Expected %d bytes", i, len(tdQuoteBody.GetRtmrs()[i]), RtmrSize)

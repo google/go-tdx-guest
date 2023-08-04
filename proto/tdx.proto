@@ -72,7 +72,7 @@ message TDQuoteBody {
   bytes mr_config_id = 8;      // should be 48 bytes
   bytes mr_owner = 9;          // should be 48 bytes
   bytes mr_owner_config = 10;  // should be 48 bytes
-  repeated bytes rtmrs = 11;   // should be 48 bytes
+  repeated bytes rtmrs = 11;   // should be 48 * rtmrsCount
   bytes report_data = 12;      // should be 64 bytes
 }
 
