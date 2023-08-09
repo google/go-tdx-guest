@@ -33,8 +33,8 @@ const (
 	iocWrite     = 1
 	iocRead      = 2
 	// Linux /dev/tdx-guest ioctl interface
-	iocTypeTdxGuestReq = 'T'
-	iocTdxWithoutNrWithoutSize    = ((iocWrite | iocRead) << iocDirshift) |
+	iocTypeTdxGuestReq         = 'T'
+	iocTdxWithoutNrWithoutSize = ((iocWrite | iocRead) << iocDirshift) |
 		(iocTypeTdxGuestReq << iocTypeshift)
 	// IocTdxGetReport is the ioctl command for getting an attestation report.
 	IocTdxGetReport = iocTdxWithoutNrWithoutSize | (unsafe.Sizeof(TdxReportReq{}) << iocSizeshift) | (0x1 << iocNrshift)
