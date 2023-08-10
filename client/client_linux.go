@@ -20,9 +20,10 @@ package client
 import (
 	"fmt"
 
+	"unsafe"
+
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"golang.org/x/sys/unix"
-	"unsafe"
 )
 
 // defaultTdxGuestDevicePath is the platform's usual device path to the TDX guest.
