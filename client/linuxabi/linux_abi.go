@@ -54,20 +54,6 @@ const (
 	GetQuoteReq = 0
 	// GetQuoteResp is a constant for report response
 	GetQuoteResp = 1
-	// MsgLibMajorVer is a constant for major version for header
-	MsgLibMajorVer = 1
-	// MsgLibMinorVer is a constant for minor version for header
-	MsgLibMinorVer = 0
-	// GetQuotesReqSize is a constant for Quote Request Msg
-	GetQuotesReqSize = 24
-	// GetQuoteRespSize is a constant for Quote Response Msg
-	GetQuoteRespSize = 24
-	// TdxQuoteHdrSize is a constant for Quote Header size
-	TdxQuoteHdrSize = 24
-	// TdQuoteBufSize is a constant denotes buffer size quote request
-	TdQuoteBufSize = ReqBufSize - GetQuotesReqSize
-	// TdIDQuoteSize is a constant denotes maximum size of array containing Quote
-	TdIDQuoteSize = TdQuoteBufSize - HeaderSize - TdxQuoteHdrSize
 )
 
 // EsResult is the status code type for Linux's GHCB communication results.
@@ -119,14 +105,6 @@ type SerializedGetQuoteReq struct {
 	ReportIDList [TdReportSize]uint8 // report followed by id list - [TODO revisit if attestation key ID is included]
 }
 
-// SerializedGetQuoteResp is used to serialized the response message.
-type SerializedGetQuoteResp struct {
-	Header         MsgHeader            // header.type = GET_QUOTE_RESP
-	SelectedIDSize uint32               // can be 0 in case only one id is sent in request
-	QuoteSize      uint32               // length of quote_data, in byte
-	IDQuote        [TdIDQuoteSize]uint8 // selected id followed by quote -[TODO revisit if attestation key ID is included]
-}
-
 // TdxQuoteHdr is Linux's tdx-guest ABI for quote header
 type TdxQuoteHdr struct {
 	/* Quote version, filled by TD */
@@ -138,7 +116,7 @@ type TdxQuoteHdr struct {
 	/* Length of Quote, filled by VMM */
 	OutLen uint32
 	/* Actual Quote data or TDREPORT on input */
-	Data [TdQuoteBufSize]byte
+	Data [ReqBufSize]byte
 }
 
 // ABI returns the object itself.

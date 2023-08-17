@@ -109,25 +109,18 @@ func TcDevice(tcs []TestCase) (*Device, error) {
 	quoteResponses := map[[labi.TdReportSize]byte]any{}
 	for _, tc := range tcs {
 		reportResponses[tc.Input] = &GetReportResponse{
-			Resp: labi.TdxReportABI{
-				Data: tc.Report,
+			Resp: labi.TdxReportReq{
+				TdReport: tc.Report,
 			},
 			EsResult: tc.EsResult,
 		}
-		var idQuote [labi.TdIDQuoteSize]byte
+		var idQuote [labi.ReqBufSize]byte
 		copy(idQuote[:], tc.Quote)
 		quoteResponses[tc.Report] = &GetQuoteResponse{
-			Resp: labi.SerializedGetQuoteResp{
-				Header: labi.MsgHeader{
-					MajorVersion: labi.MsgLibMajorVer,
-					MinorVersion: labi.MsgLibMinorVer,
-					MsgType:      labi.GetQuoteResp,
-					Size:         4998,
-					ErrorCode:    0,
-				},
-				QuoteSize:      4974,
-				SelectedIDSize: 0,
-				IDQuote:        idQuote,
+			Resp: labi.TdxQuoteHdr{
+				Status: labi.GetQuoteSuccess,
+				OutLen: uint32(len(tc.Quote)),
+				Data:   idQuote,
 			},
 			EsResult: tc.EsResult,
 		}
