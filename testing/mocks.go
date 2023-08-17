@@ -83,7 +83,7 @@ func (d *Device) getReport(req *labi.TdxReportReq) (uintptr, error) {
 
 func (d *Device) getQuote(req *labi.TdxQuoteHdr) (uintptr, error) {
 	var report [labi.TdReportSize]byte
-	copy(report[:], req.Data[:])
+	copy(report[:], req.Data[:labi.TdReportSize])
 	quoteRespI, ok := d.quoteResponse[report]
 	if !ok {
 		return 0, fmt.Errorf("test error: no response for %v", report)
