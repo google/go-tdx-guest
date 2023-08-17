@@ -83,6 +83,8 @@ func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
 			return nil, 0, fmt.Errorf("the device driver return busy")
 		} else if labi.GetQuoteServiceUnavailable == tdxHdr.Status {
 			return nil, 0, fmt.Errorf("request feature is not supported")
+		} else if tdxHdr.OutLen > labi.ReqBufSize {
+			return nil, 0, fmt.Errorf("invalid Quote size: %v. It must be less than: %v", tdxHdr.OutLen, labi.ReqBufSize)
 		} else {
 			return nil, 0, fmt.Errorf("unexpected error: %v", tdxHdr.Status)
 		}
