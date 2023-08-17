@@ -66,7 +66,7 @@ func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
 		InLen:   labi.TdReportSize,
 		OutLen:  0,
 	}
-	copy(tdxHdr.Data[:], tdReport[:])
+	copy(tdxHdr.Data[:], tdReport[:labi.TdReportSize])
 	tdxReq := labi.TdxQuoteReq{
 		Buffer: tdxHdr,
 		Length: labi.ReqBufSize,
@@ -83,8 +83,8 @@ func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
 			return nil, 0, fmt.Errorf("the device driver return busy")
 		} else if labi.GetQuoteServiceUnavailable == tdxHdr.Status {
 			return nil, 0, fmt.Errorf("request feature is not supported")
-		} else if tdxHdr.OutLen > labi.ReqBufSize {
-			return nil, 0, fmt.Errorf("invalid Quote size: %v. It must be less than: %v", tdxHdr.OutLen, labi.ReqBufSize)
+		} else if tdxHdr.OutLen == 0 || tdxHdr.OutLen > labi.ReqBufSize {
+			return nil, 0, fmt.Errorf("invalid Quote size: %v. It must be > 0 and < : %v", tdxHdr.OutLen, labi.ReqBufSize)
 		} else {
 			return nil, 0, fmt.Errorf("unexpected error: %v", tdxHdr.Status)
 		}
