@@ -17,8 +17,6 @@
 package client
 
 import (
-	"bytes"
-	"encoding/binary"
 	"flag"
 	"fmt"
 
@@ -44,14 +42,8 @@ func UseDefaultTdxGuestDevice() bool {
 
 // getReport requests for tdx report by making an ioctl call.
 func getReport(d Device, reportData [64]byte) ([]uint8, error) {
-	tdxReportData := labi.TdxReportDataABI{
-		Data: reportData,
-	}
-	var tdxReport labi.TdxReportABI
-	tdxReportReq := labi.TdxReportReq{
-		ReportData: tdxReportData.Data,
-		TdReport:   tdxReport.Data,
-	}
+	tdxReportReq := labi.TdxReportReq{}
+	copy(tdxReportReq.ReportData[:], reportData[:])
 	result, err := d.Ioctl(labi.IocTdxGetReport, &tdxReportReq)
 	if err != nil {
 		return nil, err
@@ -64,46 +56,17 @@ func getReport(d Device, reportData [64]byte) ([]uint8, error) {
 
 // GetRawQuote call getReport for report and convert it to quote using an ioctl call.
 func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
-	tdxReport := labi.TdxReportABI{
-		Data: [labi.TdReportSize]uint8{},
-	}
 	tdReport, err := getReport(d, reportData)
 	if err != nil {
 		return nil, 0, err
 	}
-	copy(tdxReport.Data[:labi.TdReportSize], tdReport[:labi.TdReportSize])
-	//get serialized quote request.
-	msgSize := uint32(labi.GetQuotesReqSize + labi.TdReportSize)
-	req := labi.SerializedGetQuoteReq{
-		Header: labi.MsgHeader{
-			MajorVersion: labi.MsgLibMajorVer,
-			MinorVersion: labi.MsgLibMinorVer,
-			MsgType:      labi.GetQuoteReq,
-			Size:         msgSize,
-			ErrorCode:    0,
-		},
-		IDListSize:   0,
-		ReportSize:   labi.TdReportSize,
-		ReportIDList: tdxReport.Data,
-	}
-	reportIDSize := new(bytes.Buffer)
-	err = binary.Write(reportIDSize, binary.LittleEndian, msgSize)
-	if err != nil {
-		return nil, 0, err
-	}
-	reportID := new(bytes.Buffer)
-	err = binary.Write(reportID, binary.LittleEndian, req)
-	if err != nil {
-		return nil, 0, err
-	}
-	data := append(reportIDSize.Bytes(), reportID.Bytes()...)
 	tdxHdr := &labi.TdxQuoteHdr{
 		Status:  0,
 		Version: 1,
-		InLen:   labi.HeaderSize + msgSize,
+		InLen:   labi.TdReportSize,
 		OutLen:  0,
 	}
-	copy(tdxHdr.Data[:], data[0:])
+	copy(tdxHdr.Data[:], tdReport[:])
 	tdxReq := labi.TdxQuoteReq{
 		Buffer: tdxHdr,
 		Length: labi.ReqBufSize,
@@ -115,43 +78,17 @@ func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
 	if result != uintptr(labi.TdxAttestSuccess) {
 		return nil, 0, fmt.Errorf("unable to get the quote")
 	}
-	if tdxHdr.Status != 0 || tdxHdr.OutLen <= labi.HeaderSize {
+	if tdxHdr.Status != 0 {
 		if labi.GetQuoteInFlight == tdxHdr.Status {
 			return nil, 0, fmt.Errorf("the device driver return busy")
 		} else if labi.GetQuoteServiceUnavailable == tdxHdr.Status {
 			return nil, 0, fmt.Errorf("request feature is not supported")
 		} else {
-			return nil, 0, fmt.Errorf("unexpected error")
+			return nil, 0, fmt.Errorf("unexpected error: %v", tdxHdr.Status)
 		}
 	}
-	inMsgSize := binary.LittleEndian.Uint32(tdxHdr.Data[0:])
-	if inMsgSize != tdxHdr.OutLen-labi.HeaderSize {
-		return nil, 0, fmt.Errorf("unexpected error")
-	}
-	// sanity check, the size shouldn't smaller than SerializedGetQuoteReq
-	if inMsgSize < labi.GetQuoteRespSize {
-		return nil, 0, fmt.Errorf("unexpected error")
-	}
-	resp := labi.SerializedGetQuoteResp{}
-	buff := bytes.NewReader(tdxHdr.Data[4:])
-	err = binary.Read(buff, binary.LittleEndian, &resp)
-	if err != nil {
-		return nil, 0, err
-	}
-	// Only major version is checked, minor change is deemed as compatible.
-	if resp.Header.MajorVersion != labi.MsgLibMajorVer {
-		return nil, 0, fmt.Errorf("unrecognized version of serialized data")
-	}
-	if resp.Header.MsgType != labi.GetQuoteResp {
-		return nil, 0, fmt.Errorf("invalid message type found")
-	}
-	if resp.Header.Size != inMsgSize {
-		return nil, 0, fmt.Errorf("invalid message size found")
-	}
-	if resp.Header.ErrorCode == labi.TdxAttestSuccess {
-		return resp.IDQuote[:resp.QuoteSize], resp.QuoteSize, nil
-	}
-	return []uint8{}, 0, nil
+
+	return tdxHdr.Data[:tdxHdr.OutLen], tdxHdr.OutLen, nil
 }
 
 // GetQuote call GetRawQuote to get the quote in byte array and convert it into proto.

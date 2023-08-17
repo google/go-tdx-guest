@@ -93,75 +93,13 @@ const (
 	TdxAttestErrorUnexpected = 0x0001
 )
 
-// TdxReportDataABI is Linux's tdx-guest abi for ReportData
-type TdxReportDataABI struct {
-	// Data is the reportData of 64 bytes
-	Data [TdReportDataSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportDataABI) ABI() BinaryConversion { return r }
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportDataABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish is a no-op.
-func (r *TdxReportDataABI) Finish(BinaryConvertible) error {
-	return nil
-}
-
-// TdxReportABI is Linux's tdx-guest abi for report response
-type TdxReportABI struct {
-	// Data is the report response data
-	Data [TdReportSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportABI) ABI() BinaryConversion { return r }
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish is a no-op.
-func (r *TdxReportABI) Finish(BinaryConvertible) error {
-	return nil
-}
-
-// TdxReportReqABI is Linux's tdx-guest ABI for TDX Report
-type TdxReportReqABI struct {
-	/* Report data of 64 bytes */
-	ReportData unsafe.Pointer
-	/* Actual TD Report Data */
-	TdReport unsafe.Pointer
-}
-
 // TdxReportReq is Linux's tdx-guest ABI for TDX Report. The
 // types here enhance runtime safety when using Ioctl as an interface.
 type TdxReportReq struct {
 	/* Report data of 64 bytes */
-	ReportData [TdReportDataSize]uint8
+	ReportData [TdReportDataSize]byte
 	/* Actual TD Report Data */
-	TdReport [TdReportSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportReq) ABI() BinaryConversion {
-	return &TdxReportReqABI{
-		ReportData: unsafe.Pointer(&r.ReportData[0]),
-		TdReport:   unsafe.Pointer(&r.TdReport[0]),
-	}
-}
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportReqABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish writes back the changed value.
-func (r *TdxReportReqABI) Finish(b BinaryConvertible) error {
-	_, ok := b.(*TdxReportReq)
-	if !ok {
-		return fmt.Errorf("argument is %v. Expects a *TdxReportReq", reflect.TypeOf(b))
-	}
-	return nil
+	TdReport [TdReportSize]byte
 }
 
 // MsgHeader is used to add header field to serialized request and response message.
