@@ -16,8 +16,6 @@
 package testing
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -26,13 +24,13 @@ import (
 
 // GetReportResponse represents a mocked response to a command request.
 type GetReportResponse struct {
-	Resp     labi.TdxReportABI
+	Resp     labi.TdxReportReq
 	EsResult labi.EsResult
 }
 
 // GetQuoteResponse represents a mocked response to a command request.
 type GetQuoteResponse struct {
-	Resp     labi.SerializedGetQuoteResp
+	Resp     labi.TdxQuoteHdr
 	EsResult labi.EsResult
 }
 
@@ -79,13 +77,13 @@ func (d *Device) getReport(req *labi.TdxReportReq) (uintptr, error) {
 		return 0, fmt.Errorf("test error: incorrect response for %v", tdReportRespI)
 	}
 	esResult := uintptr(tdReportResp.EsResult)
-	req.TdReport = tdReportResp.Resp.Data
+	req.TdReport = tdReportResp.Resp.TdReport
 	return esResult, nil
 }
 
 func (d *Device) getQuote(req *labi.TdxQuoteHdr) (uintptr, error) {
 	var report [labi.TdReportSize]byte
-	copy(report[:], req.Data[labi.GetQuotesReqSize+labi.HeaderSize:])
+	copy(report[:], req.Data[:labi.TdReportSize])
 	quoteRespI, ok := d.quoteResponse[report]
 	if !ok {
 		return 0, fmt.Errorf("test error: no response for %v", report)
@@ -96,19 +94,8 @@ func (d *Device) getQuote(req *labi.TdxQuoteHdr) (uintptr, error) {
 		return 0, fmt.Errorf("test error: incorrect response for %v", quoteRespI)
 	}
 	esResult := uintptr(quoteResp.EsResult)
-
-	msgSize := uint32(quoteResp.Resp.Header.Size)
-	respSize := new(bytes.Buffer)
-	if err := binary.Write(respSize, binary.LittleEndian, msgSize); err != nil {
-		return 0, err
-	}
-	resp := new(bytes.Buffer)
-	if err := binary.Write(resp, binary.LittleEndian, quoteResp.Resp); err != nil {
-		return 0, err
-	}
-	data := append(respSize.Bytes(), resp.Bytes()...)
-	req.OutLen = quoteResp.Resp.QuoteSize + labi.HeaderSize + labi.GetQuoteRespSize
-	copy(req.Data[:], data[:])
+	copy(req.Data[:], quoteResp.Resp.Data[:])
+	req.OutLen = quoteResp.Resp.OutLen
 	return esResult, nil
 }
 

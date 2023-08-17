@@ -33,16 +33,13 @@ const (
 	iocWrite     = 1
 	iocRead      = 2
 	// Linux /dev/tdx-guest ioctl interface
-	iocTypeTdxGuestReq = 'T'
-	iocTdxWithoutNr    = ((iocWrite | iocRead) << iocDirshift) |
-		(iocTypeTdxGuestReq << iocTypeshift) |
-		(64 << iocSizeshift)
-	// IocTdxGetReport is the ioctl command for getting an attestation report
-	IocTdxGetReport = iocTdxWithoutNr | (0x1 << iocNrshift)
-	// IocTdxGetQuote is the ioctl command for getting an attestation quote
-	IocTdxGetQuote = ((iocRead) << iocDirshift) |
-		(iocTypeTdxGuestReq << iocTypeshift) | (0x2 << iocNrshift) |
-		(64 << iocSizeshift)
+	iocTypeTdxGuestReq         = 'T'
+	iocTdxWithoutNrWithoutSize = ((iocWrite | iocRead) << iocDirshift) |
+		(iocTypeTdxGuestReq << iocTypeshift)
+	// IocTdxGetReport is the ioctl command for getting an attestation report.
+	IocTdxGetReport = iocTdxWithoutNrWithoutSize | (unsafe.Sizeof(TdxReportReq{}) << iocSizeshift) | (0x1 << iocNrshift)
+	// IocTdxGetQuote is the ioctl command for getting an attestation quote.
+	IocTdxGetQuote = iocTdxWithoutNrWithoutSize | (unsafe.Sizeof(TdxQuoteReqABI{}) << iocSizeshift) | (0x2 << iocNrshift)
 	// TdReportDataSize is a constant for TDX ReportData size
 	TdReportDataSize = 64
 	// TdReportSize is a constant for TDX Report size
@@ -57,20 +54,6 @@ const (
 	GetQuoteReq = 0
 	// GetQuoteResp is a constant for report response
 	GetQuoteResp = 1
-	// MsgLibMajorVer is a constant for major version for header
-	MsgLibMajorVer = 1
-	// MsgLibMinorVer is a constant for minor version for header
-	MsgLibMinorVer = 0
-	// GetQuotesReqSize is a constant for Quote Request Msg
-	GetQuotesReqSize = 24
-	// GetQuoteRespSize is a constant for Quote Response Msg
-	GetQuoteRespSize = 24
-	// TdxQuoteHdrSize is a constant for Quote Header size
-	TdxQuoteHdrSize = 24
-	// TdQuoteBufSize is a constant denotes buffer size quote request
-	TdQuoteBufSize = ReqBufSize - GetQuotesReqSize
-	// TdIDQuoteSize is a constant denotes maximum size of array containing Quote
-	TdIDQuoteSize = TdQuoteBufSize - HeaderSize - TdxQuoteHdrSize
 )
 
 // EsResult is the status code type for Linux's GHCB communication results.
@@ -96,75 +79,13 @@ const (
 	TdxAttestErrorUnexpected = 0x0001
 )
 
-// TdxReportDataABI is Linux's tdx-guest abi for ReportData
-type TdxReportDataABI struct {
-	// Data is the reportData of 64 bytes
-	Data [TdReportDataSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportDataABI) ABI() BinaryConversion { return r }
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportDataABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish is a no-op.
-func (r *TdxReportDataABI) Finish(BinaryConvertible) error {
-	return nil
-}
-
-// TdxReportABI is Linux's tdx-guest abi for report response
-type TdxReportABI struct {
-	// Data is the report response data
-	Data [TdReportSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportABI) ABI() BinaryConversion { return r }
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish is a no-op.
-func (r *TdxReportABI) Finish(BinaryConvertible) error {
-	return nil
-}
-
-// TdxReportReqABI is Linux's tdx-guest ABI for TDX Report
-type TdxReportReqABI struct {
-	/* Report data of 64 bytes */
-	ReportData unsafe.Pointer
-	/* Actual TD Report Data */
-	TdReport unsafe.Pointer
-}
-
 // TdxReportReq is Linux's tdx-guest ABI for TDX Report. The
 // types here enhance runtime safety when using Ioctl as an interface.
 type TdxReportReq struct {
 	/* Report data of 64 bytes */
-	ReportData [TdReportDataSize]uint8
+	ReportData [TdReportDataSize]byte
 	/* Actual TD Report Data */
-	TdReport [TdReportSize]uint8
-}
-
-// ABI returns the object itself.
-func (r *TdxReportReq) ABI() BinaryConversion {
-	return &TdxReportReqABI{
-		ReportData: unsafe.Pointer(&r.ReportData[0]),
-		TdReport:   unsafe.Pointer(&r.TdReport[0]),
-	}
-}
-
-// Pointer returns a pointer to the object itself.
-func (r *TdxReportReqABI) Pointer() unsafe.Pointer { return unsafe.Pointer(r) }
-
-// Finish writes back the changed value.
-func (r *TdxReportReqABI) Finish(b BinaryConvertible) error {
-	_, ok := b.(*TdxReportReq)
-	if !ok {
-		return fmt.Errorf("argument is %v. Expects a *TdxReportReq", reflect.TypeOf(b))
-	}
-	return nil
+	TdReport [TdReportSize]byte
 }
 
 // MsgHeader is used to add header field to serialized request and response message.
@@ -184,14 +105,6 @@ type SerializedGetQuoteReq struct {
 	ReportIDList [TdReportSize]uint8 // report followed by id list - [TODO revisit if attestation key ID is included]
 }
 
-// SerializedGetQuoteResp is used to serialized the response message.
-type SerializedGetQuoteResp struct {
-	Header         MsgHeader            // header.type = GET_QUOTE_RESP
-	SelectedIDSize uint32               // can be 0 in case only one id is sent in request
-	QuoteSize      uint32               // length of quote_data, in byte
-	IDQuote        [TdIDQuoteSize]uint8 // selected id followed by quote -[TODO revisit if attestation key ID is included]
-}
-
 // TdxQuoteHdr is Linux's tdx-guest ABI for quote header
 type TdxQuoteHdr struct {
 	/* Quote version, filled by TD */
@@ -203,7 +116,7 @@ type TdxQuoteHdr struct {
 	/* Length of Quote, filled by VMM */
 	OutLen uint32
 	/* Actual Quote data or TDREPORT on input */
-	Data [TdQuoteBufSize]byte
+	Data [ReqBufSize]byte
 }
 
 // ABI returns the object itself.

@@ -20,12 +20,14 @@ package client
 import (
 	"fmt"
 
+	"unsafe"
+
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"golang.org/x/sys/unix"
 )
 
 // defaultTdxGuestDevicePath is the platform's usual device path to the TDX guest.
-const defaultTdxGuestDevicePath = "/dev/tdx-guest"
+const defaultTdxGuestDevicePath = "/dev/tdx_guest"
 
 // LinuxDevice implements the Device interface with Linux ioctls.
 type LinuxDevice struct {
@@ -87,9 +89,7 @@ func (d *LinuxDevice) Ioctl(command uintptr, req any) (uintptr, error) {
 		}
 		return result, nil
 	case *labi.TdxReportReq:
-		abi := sreq.ABI()
-		result, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(d.fd), command, uintptr(abi.Pointer()))
-		abi.Finish(sreq)
+		result, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(d.fd), command, uintptr(unsafe.Pointer(req.(*labi.TdxReportReq))))
 		if errno != 0 {
 			return 0, errno
 		}
