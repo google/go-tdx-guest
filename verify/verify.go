@@ -1108,9 +1108,10 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 	return verifyQuote(quote, options)
 }
 
-// Deprecated: Use TdxAttestation insted. This function is no longer recommended for use.
 // TdxVerify verifies the protobuf representation of an attestation quote's signature based
 // on the quote's SignatureAlgo, provided the certificate chain is valid.
+//
+// Deprecated: Use TdxAttestation instead. This function is no longer recommended for use.
 func TdxVerify(quote *pb.QuoteV4, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
