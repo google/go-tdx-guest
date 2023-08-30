@@ -1108,9 +1108,50 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 	return verifyQuote(quote, options)
 }
 
+// Deprecated: Use TdxAttestation insted. This function is no longer recommended for use.
 // TdxVerify verifies the protobuf representation of an attestation quote's signature based
 // on the quote's SignatureAlgo, provided the certificate chain is valid.
 func TdxVerify(quote *pb.QuoteV4, options *Options) error {
+	if options == nil {
+		return ErrOptionsNil
+	}
+
+	if err := abi.CheckQuoteV4(quote); err != nil {
+		return fmt.Errorf("QuoteV4 invalid: %v", err)
+	}
+
+	chain, err := extractChainFromQuote(quote)
+	if err != nil {
+		return err
+	}
+	exts, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
+	if err != nil {
+		return fmt.Errorf("could not get PCK certificate extensions: %v", err)
+	}
+	var collateral *Collateral
+	if options.GetCollateral {
+
+		ca, err := extractCaFromPckCert(chain.PCKCertificate)
+		if err != nil {
+			return err
+		}
+		collateral, err = obtainCollateral(exts.FMSPC, ca, options)
+		if err != nil {
+			return err
+		}
+	}
+	options.collateral = collateral
+	options.pckCertExtensions = exts
+	options.chain = chain
+	if options.Now.IsZero() {
+		options.Now = time.Now()
+	}
+	return verifyEvidence(quote, options)
+}
+
+// TdxAttestation verifies the protobuf representation of an attestation quote's signature based
+// on the quote's SignatureAlgo, provided the certificate chain is valid.
+func TdxAttestation(quote *pb.QuoteV4, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
 	}
@@ -1155,7 +1196,7 @@ func RawTdxQuoteVerify(raw []byte, options *Options) error {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
 
-	return TdxVerify(quote, options)
+	return TdxAttestation(quote, options)
 }
 
 // Parse root certificates from the embedded trusted_root certificate file.

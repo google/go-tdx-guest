@@ -155,7 +155,7 @@ func main() {
 		TrustedRoots: nil,
 	}
 
-	if err := verify.TdxVerify(quote, &verifyOpts); err != nil {
+	if err := verify.TdxAttestation(quote, &verifyOpts); err != nil {
 		// Make the exit code more helpful when there are network errors
 		// that affected the result.
 		exitCode := exitVerify
