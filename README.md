@@ -89,7 +89,7 @@ This type contains five fields:
 *   `Getter HTTPSGetter`: if `nil`, uses `DefaultHTTPSGetter()`.
     The `HTTPSGetter` interface consists of a single method `Get(url string)
     (map[string][]string, []byte, error)` that should return the headers and body
-    of the HTssTPS response.
+    of the HTTPS response.
 *   `Now time.Time`: if `nil`, uses `time.Now()`. It is the time at which to verify
     the validity of certificates and collaterals.
 *   `TrustedRoots *x509.CertPool`: if `nil`, uses the library's embedded
