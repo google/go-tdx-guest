@@ -1199,7 +1199,7 @@ func RawTdxQuoteVerify(raw []byte, options *Options) error {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
 
-	return TdxVerify(quote, options)
+	return TdxAttestation(quote, options)
 }
 
 // RawTdxAttestation verifies the raw bytes representation of an attestation quote
