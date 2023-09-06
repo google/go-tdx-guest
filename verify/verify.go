@@ -1111,7 +1111,7 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 // TdxVerify verifies the protobuf representation of an attestation quote's signature based
 // on the quote's SignatureAlgo, provided the certificate chain is valid.
 //
-// Deprecated: Use TdxAttestation instead. This function is no longer recommended for use.
+// Deprecated: Use TdxQuote instead. This function is no longer recommended for use.
 func TdxVerify(quote *pb.QuoteV4, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
@@ -1150,9 +1150,9 @@ func TdxVerify(quote *pb.QuoteV4, options *Options) error {
 	return verifyEvidence(quote, options)
 }
 
-// TdxAttestation verifies the protobuf representation of an attestation quote's signature based
+// TdxQuote verifies the protobuf representation of an attestation quote's signature based
 // on the quote's SignatureAlgo, provided the certificate chain is valid.
-func TdxAttestation(quote *pb.QuoteV4, options *Options) error {
+func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
 	}
@@ -1192,24 +1192,24 @@ func TdxAttestation(quote *pb.QuoteV4, options *Options) error {
 
 // RawTdxQuoteVerify verifies the raw bytes representation of an attestation quote
 //
-// Deprecated: Use RawTdxAttestation instead. This function is no longer recommended for use.
+// Deprecated: Use RawTdxQuote instead. This function is no longer recommended for use.
 func RawTdxQuoteVerify(raw []byte, options *Options) error {
 	quote, err := abi.QuoteToProto(raw)
 	if err != nil {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
 
-	return TdxAttestation(quote, options)
+	return TdxQuote(quote, options)
 }
 
-// RawTdxAttestation verifies the raw bytes representation of an attestation quote
-func RawTdxAttestation(raw []byte, options *Options) error {
+// RawTdxQuote verifies the raw bytes representation of an attestation quote
+func RawTdxQuote(raw []byte, options *Options) error {
 	quote, err := abi.QuoteToProto(raw)
 	if err != nil {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
 
-	return TdxAttestation(quote, options)
+	return TdxQuote(quote, options)
 }
 
 // Parse root certificates from the embedded trusted_root certificate file.

@@ -32,8 +32,8 @@ func convert(a []byte, x byte) []byte {
 	return a
 }
 
-func TestTdxAttestation(t *testing.T) {
-	if err := TdxAttestation(nil, nil); err != vr.ErrOptionsNil {
+func TestTdxQuote(t *testing.T) {
+	if err := TdxQuote(nil, nil); err != vr.ErrOptionsNil {
 		t.Error(err)
 	}
 	qeSvn := uint16(0)
@@ -262,9 +262,9 @@ func TestTdxAttestation(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if err := TdxAttestation(tc.quote, tc.opts); (err == nil && tc.wantErr != "") ||
+		if err := TdxQuote(tc.quote, tc.opts); (err == nil && tc.wantErr != "") ||
 			(err != nil && (tc.wantErr == "" || !strings.Contains(err.Error(), tc.wantErr))) {
-			t.Errorf("%s: TdxAttestation() errored unexpectedly. Got '%v', want '%s'", tc.name, err, tc.wantErr)
+			t.Errorf("%s: TdxQuote() errored unexpectedly. Got '%v', want '%s'", tc.name, err, tc.wantErr)
 		}
 	}
 }
