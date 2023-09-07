@@ -247,7 +247,7 @@ func TestNegativeValidateX509Certificate(t *testing.T) {
 
 func TestRawQuoteVerifyWithoutCollateral(t *testing.T) {
 	options := &Options{CheckRevocations: false, GetCollateral: false, Now: currentTime}
-	if err := RawTdxAttestation(testdata.RawQuote, options); err != nil {
+	if err := RawTdxQuote(testdata.RawQuote, options); err != nil {
 		t.Error(err)
 	}
 }
@@ -329,8 +329,8 @@ func TestNegativeVerification(t *testing.T) {
 	for _, tc := range tests {
 		copy(rawQuote, testdata.RawQuote)
 		rawQuote[tc.changeIndex] = tc.changeValue
-		if err := RawTdxAttestation(rawQuote, options); err == nil || err.Error() != tc.wantErr {
-			t.Errorf("%s: RawTdxAttestation() = %v. Want error %v", tc.name, err, tc.wantErr)
+		if err := RawTdxQuote(rawQuote, options); err == nil || err.Error() != tc.wantErr {
+			t.Errorf("%s: RawTdxQuote() = %v. Want error %v", tc.name, err, tc.wantErr)
 		}
 	}
 }
@@ -710,8 +710,8 @@ func TestNegativeRawQuoteVerifyWithCollateral(t *testing.T) {
 	wantErr := "PCS's reported TDX TCB info failed TCB status check: no matching TCB level found"
 	// Due to updated SVN values in the sample response, it will result in TCB status failure,
 	// when compared to the TD Quote Body's TeeTcbSvn value.
-	if err := RawTdxAttestation(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
-		t.Errorf("No matching TCB: RawTdxAttestation() = %v. Want error %v", err, wantErr)
+	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
+		t.Errorf("No matching TCB: RawTdxQuote() = %v. Want error %v", err, wantErr)
 	}
 }
 
@@ -719,7 +719,7 @@ func TestNegativeCheckRevocation(t *testing.T) {
 	getter := testcases.TestGetter
 	options := &Options{CheckRevocations: true, GetCollateral: false, Getter: getter}
 	wantErr := "unable to check for certificate revocation as GetCollateral parameter in the options is set to false"
-	if err := RawTdxAttestation(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
-		t.Errorf("Check Revocation Without GetCollateral: RawTdxAttestation() = %v. Want error %v", err, wantErr)
+	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
+		t.Errorf("Check Revocation Without GetCollateral: RawTdxQuote() = %v. Want error %v", err, wantErr)
 	}
 }

@@ -60,7 +60,7 @@ and the requirements for certificate well-formedness come from the
 The presence of the PCK Certificate Chain within the input attestation quote is
 expected.
 
-### `func TdxAttestation(quote *pb.QuoteV4, options *Options) error`
+### `func TdxQuote(quote *pb.QuoteV4, options *Options) error`
 
 This function verifies that the attestation has a valid signature and
 certificate chain. It provides an optional verification against the collateral
@@ -73,17 +73,17 @@ documentation.
 Example expected invocation:
 
 ```
-verify.TdxAttestation(myAttestation, verify.Options())
+verify.TdxQuote(myAttestation, verify.Options())
 ```
 
 #### `Options` type
 
 This type contains five fields:
 
-*   `GetCollateral bool`: if true, then `TdxAttestation` will download the collateral
+*   `GetCollateral bool`: if true, then `TdxQuote` will download the collateral
     from Intel PCS API service and check against collateral obtained.
     Must be `true` if `CheckRevocations` is true.
-*   `CheckRevocations bool`: if true, then `TdxAttestation` will download the
+*   `CheckRevocations bool`: if true, then `TdxQuote` will download the
     certificate revocation list (CRL) from Intel PCS API service and check for
     revocations.
 *   `Getter HTTPSGetter`: if `nil`, uses `DefaultHTTPSGetter()`.
