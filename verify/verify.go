@@ -30,11 +30,13 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"os"
 	"reflect"
 	"time"
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
+	cpb "github.com/google/go-tdx-guest/proto/check"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/verify/trust"
 	"github.com/google/logger"
@@ -1156,6 +1158,69 @@ func RawTdxQuote(raw []byte, options *Options) error {
 	}
 
 	return TdxQuote(quote, options)
+}
+
+func getCertFromBytes(data []byte, phrase string) (*x509.Certificate, error) {
+	cert, rem := pem.Decode(data)
+	if cert == nil {
+		return nil, fmt.Errorf("could not parse PEM formatted %q certificate", phrase)
+	}
+	if len(rem) != 0 {
+		return nil, fmt.Errorf("unexpected trailing bytes: %d bytes", len(rem))
+	}
+	if cert.Type != certificateType {
+		return nil, fmt.Errorf(`the %q PEM block type is %q. Expect %q`, phrase, cert.Type, certificateType)
+	}
+	trustedCert, err := x509.ParseCertificate(cert.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not interpret DER bytes of %q certificate : %v", phrase, err)
+	}
+	return trustedCert, nil
+}
+
+func getCertFromPath(path string, phrase string) (*x509.Certificate, error) {
+	certBytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return getCertFromBytes(certBytes, phrase)
+}
+
+func getTrustedRoots(rot *cpb.RootOfTrust) (*x509.CertPool, error) {
+	if len(rot.CabundlePaths) == 0 && len(rot.Cabundles) == 0 {
+		return nil, nil
+	}
+	result := x509.NewCertPool()
+	for _, path := range rot.CabundlePaths {
+		cert, err := getCertFromPath(path, "trusted")
+		if err != nil {
+			return nil, fmt.Errorf("could not parse CA bundle %q: %v", path, err)
+		}
+		result.AddCert(cert)
+	}
+	for _, cabundle := range rot.Cabundles {
+		cert, err := getCertFromBytes([]byte(cabundle), "trusted")
+		if err != nil {
+			return nil, fmt.Errorf("could not parse CA bundle bytes: %v", err)
+		}
+		result.AddCert(cert)
+	}
+	return result, nil
+}
+
+// RootOfTrustToOptions translates the RootOfTrust message into the Options type needed
+// for driving an attestation verification.
+func RootOfTrustToOptions(rot *cpb.RootOfTrust) (*Options, error) {
+	trustedRoots, err := getTrustedRoots(rot)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Options{
+		CheckRevocations: rot.CheckCrl,
+		GetCollateral:    rot.GetCollateral,
+		TrustedRoots:     trustedRoots,
+	}, nil
 }
 
 // Parse root certificates from the embedded trusted_root certificate file.
