@@ -107,6 +107,7 @@ func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
 	}
 	return nil
 }
+
 func checkOptionsLengths(opts *Options) error {
 	return multierr.Combine(
 		lengthCheck("mr_seam", abi.MrSeamSize, opts.TdQuoteBodyOptions.MrSeam),
