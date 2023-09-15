@@ -64,8 +64,8 @@ var (
 
 	configProto = flag.String("config", "",
 		("A path to a serialized check.Config protobuf. Any individual field flags will" +
-			" overwrite the message's associated field. Default unmarshalled as binary. Paths" +
-			" ending in .textproto will be unmarshalled as prototext."))
+			" overwrite the message's associated field. By default, the file will be unmarshalled as binary," +
+			" but if it ends in .textproto, it will be unmarshalled as prototext instead."))
 	quiet   = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
 	verbose = flag.Bool("verbose", false, "Enable verbose logging.")
 
