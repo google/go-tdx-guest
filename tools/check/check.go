@@ -146,13 +146,13 @@ func parseQuote(b []byte) (*pb.QuoteV4, error) {
 func parseUint(p string, bits int) (uint64, error) {
 	base := 10
 	prepped := p
-	if strings.HasPrefix(p, "0x") || strings.HasPrefix(p, "0X") {
+	if strings.HasPrefix(strings.ToLower(p), "0x") {
 		base = 16
 		prepped = prepped[2:]
-	} else if strings.HasPrefix(p, "0o") || strings.HasPrefix(p, "0O") {
+	} else if strings.HasPrefix(strings.ToLower(p), "0o") {
 		base = 8
 		prepped = prepped[2:]
-	} else if strings.HasPrefix(p, "0b") || strings.HasPrefix(p, "0B") {
+	} else if strings.HasPrefix(strings.ToLower(p), "0b") {
 		base = 2
 		prepped = prepped[2:]
 	}

@@ -76,10 +76,10 @@ message RootOfTrust {
 // Config is the overall message input for the check tool. This provides all
 // the flags that configure the tool, including the validation policy.
 message Config {
+  // The report validation policy.
+  Policy policy = 1;
+
   // Configures which hardware keys to trust. Default uses library-embedded
   // certificate.
-  RootOfTrust root_of_trust = 1;
-
-  // The report validation policy.
-  Policy policy = 2;
+  RootOfTrust root_of_trust = 2;
 }
