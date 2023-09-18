@@ -39,7 +39,8 @@ const (
 
 var (
 	pcsSgxBaseURL = "https://api.trustedservices.intel.com/sgx/certification/v4"
-	pcsTdxBaseURL = "https://api.trustedservices.intel.com/tdx/certification/v4"
+	// pcsTdxBaseURL = "https://api.trustedservices.intel.com/tdx/certification/v4"
+	pcsTdxBaseURL = "https://sbx.api.trustedservices.intel.com/sgx/certification"
 
 	sgxTcbComponentOidPrefix = []int{1, 2, 840, 113741, 1, 13, 1, 2}
 
