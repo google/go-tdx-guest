@@ -93,7 +93,7 @@ func lengthCheck(name string, length int, value []byte) error {
 }
 
 func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
-	if value == nil || len(value) == 0 {
+	if len(value) == 0 {
 		return nil
 	}
 	if len(value) != size {
