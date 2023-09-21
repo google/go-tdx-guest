@@ -365,7 +365,7 @@ func TestNetworkFlags(t *testing.T) {
 
 func TestCaBundles(t *testing.T) {
 	correctPath := []string{"../../verify/trusted_root.pem",
-		"../../verify/trusted_root.pem:../../verify/trusted_root.pem"}
+		"../../verify/trusted_root.pem,../../verify/trusted_root.pem"}
 	fakePath := []string{"fake_path"}
 
 	for _, path := range correctPath {

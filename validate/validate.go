@@ -93,10 +93,10 @@ func lengthCheck(name string, length int, value []byte) error {
 }
 
 func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
-	if value == nil {
+	if value == nil || len(value) == 0 {
 		return nil
 	}
-	if len(value) != 0 && len(value) != size {
+	if len(value) != size {
 		return fmt.Errorf("option %q size is %d. Want %d", name, len(value), size)
 	}
 
@@ -156,7 +156,7 @@ func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
 	return opts, nil
 }
 
-func byteCheckRtmr(field string, size int, given, required [][]byte) error {
+func byteCheckRtmr(size int, given, required [][]byte) error {
 	if len(required) == 0 {
 		return nil
 	}
@@ -171,8 +171,8 @@ func byteCheckRtmr(field string, size int, given, required [][]byte) error {
 			return fmt.Errorf("RTMR[%d] should be 48 bytes, found %d", i, len(required[i]))
 		}
 		if !bytes.Equal(required[i], given[i]) {
-			return fmt.Errorf("quote field %s[%d] is %s. Expect %s",
-				field, i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
+			return fmt.Errorf("quote field RTMR[%d] is %s. Expect %s",
+				i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		}
 	}
 	return nil
@@ -202,7 +202,7 @@ func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
 		byteCheck("MrConfigID", "MR_CONFIG_ID", abi.MrConfigIDSize, quote.GetTdQuoteBody().GetMrConfigId(), opts.TdQuoteBodyOptions.MrConfigID),
 		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, quote.GetTdQuoteBody().GetMrOwner(), opts.TdQuoteBodyOptions.MrOwner),
 		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, quote.GetTdQuoteBody().GetMrOwnerConfig(), opts.TdQuoteBodyOptions.MrOwnerConfig),
-		byteCheckRtmr("RTMR", abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
+		byteCheckRtmr(abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
 		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, quote.GetTdQuoteBody().GetReportData(), opts.TdQuoteBodyOptions.ReportData),
 		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, quote.GetHeader().GetQeVendorId(), opts.HeaderOptions.QeVendorID),
 	)

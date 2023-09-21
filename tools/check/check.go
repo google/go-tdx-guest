@@ -94,7 +94,7 @@ var (
 		"Comma-separated hex strings representing expected values of RTMRS field. Expected 4 strings, either empty or each must encode 48 bytes. Unchecked if unset")
 
 	cabundles = flag.String("trusted_roots", "",
-		"Colon-separated paths to CA bundles for the Intel TDX. Must be in PEM format, Root CA certificate. If unset, uses embedded root certificate.")
+		"Comma-separated paths to CA bundles for the Intel TDX. Must be in PEM format, Root CA certificate. If unset, uses embedded root certificate.")
 	// Optional Uint16. We don't want 0 to override the policy message, so instead of parsing
 	// as Uint16 up front, we keep the flag a string and parse later if given.
 	minqesvn  = flag.String("minimum_qe_svn", "", "The minimum acceptable value for QE_SVN field.")
@@ -204,13 +204,8 @@ func parseConfig(path string) error {
 	if path == "" {
 		return nil
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("could not open %q: %v", path, err)
-	}
-	defer f.Close()
 
-	contents, err := io.ReadAll(f)
+	contents, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("could not read %q: %v", path, err)
 	}
@@ -233,10 +228,10 @@ func parseConfig(path string) error {
 }
 
 func parsePaths(s string) ([]string, error) {
-	paths := strings.Split(s, ":")
-	if len(paths) == 1 && paths[0] == "" {
+	if s == "" {
 		return nil, nil
 	}
+	paths := strings.Split(s, ",")
 	var result []string
 	for _, path := range paths {
 		p := strings.TrimSpace(path)
@@ -253,10 +248,10 @@ func parsePaths(s string) ([]string, error) {
 }
 
 func parseRtmrs(s string) ([][]byte, error) {
-	hexstrings := strings.Split(s, ",")
-	if len(hexstrings) == 1 && hexstrings[0] == "" {
+	if s == "" {
 		return nil, nil
 	}
+	hexstrings := strings.Split(s, ",")
 	var result [][]byte
 	for _, hexstring := range hexstrings {
 		h, err := hex.DecodeString(strings.TrimSpace(hexstring))
@@ -270,7 +265,7 @@ func parseRtmrs(s string) ([][]byte, error) {
 
 func setBool(value *bool, name, flag string, defaultValue bool) error {
 	if flag == "" {
-		if !override() {
+		if !configProtoPresent() {
 			*value = defaultValue
 		}
 	} else if flag == "true" {
@@ -286,7 +281,7 @@ func setBool(value *bool, name, flag string, defaultValue bool) error {
 
 func setUint(value *uint64, bits int, name, flag string, defaultValue uint64) error {
 	if flag == "" {
-		if !override() {
+		if !configProtoPresent() {
 			*value = defaultValue
 		}
 	} else {
@@ -308,7 +303,7 @@ func setUint32(value *uint32, name, flag string, defaultValue uint64) error {
 	return nil
 }
 
-func override() bool {
+func configProtoPresent() bool {
 	return *configProto != ""
 }
 
