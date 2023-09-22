@@ -107,6 +107,7 @@ var (
 	maxRetryDelay   = flag.Duration("max_retry_delay", defaultMaxRetryDelay, "Maximum Duration to wait between HTTP request retries.")
 	testLocalGetter = flag.Bool("test_local_getter", false, "Use this flag only to test this CLI tool when network access is not available")
 
+	// Assign the values of the flags to the corresponding proto fields
 	config = &checkpb.Config{
 		RootOfTrust: &checkpb.RootOfTrust{},
 		Policy:      &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}},
