@@ -240,7 +240,7 @@ func TestTdxQuote(t *testing.T) {
 				Rtmrs: make2darray(abi.RtmrSize),
 			},
 			},
-			wantErr: "quote field RTMRS",
+			wantErr: "quote field RTMR",
 		},
 		{
 			name:  "Test incorrect REPORT_DATA",

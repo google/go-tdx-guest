@@ -30,11 +30,13 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"os"
 	"reflect"
 	"time"
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
+	cpb "github.com/google/go-tdx-guest/proto/check"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/verify/trust"
 	"github.com/google/logger"
@@ -1210,6 +1212,44 @@ func RawTdxQuote(raw []byte, options *Options) error {
 	}
 
 	return TdxQuote(quote, options)
+}
+
+func getTrustedRoots(rot *cpb.RootOfTrust) (*x509.CertPool, error) {
+	if len(rot.CabundlePaths) == 0 && len(rot.Cabundles) == 0 {
+		return nil, nil
+	}
+	result := x509.NewCertPool()
+	for _, path := range rot.CabundlePaths {
+		certBytes, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse CA bundle %q: %v", path, err)
+		}
+		if !result.AppendCertsFromPEM(certBytes) {
+			return nil, fmt.Errorf("CA bundle %q did not contain certs", path)
+		}
+	}
+
+	for i, cabundle := range rot.Cabundles {
+		if !result.AppendCertsFromPEM([]byte(cabundle)) {
+			return nil, fmt.Errorf("CA bundle %d did not contain certs", i)
+		}
+	}
+	return result, nil
+}
+
+// RootOfTrustToOptions translates the RootOfTrust message into the Options type needed
+// for driving an attestation verification.
+func RootOfTrustToOptions(rot *cpb.RootOfTrust) (*Options, error) {
+	trustedRoots, err := getTrustedRoots(rot)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Options{
+		CheckRevocations: rot.CheckCrl,
+		GetCollateral:    rot.GetCollateral,
+		TrustedRoots:     trustedRoots,
+	}, nil
 }
 
 // Parse root certificates from the embedded trusted_root certificate file.

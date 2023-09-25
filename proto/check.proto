@@ -33,8 +33,8 @@ message Policy {
 }
 
 message HeaderPolicy {
-  uint32 minmum_qe_svn = 1; //should not exceed uint16 max
-  uint32 minimum_pce_svn = 2; //should not exceed uint16 max
+  uint32 minimum_qe_svn = 1;   // should not exceed uint16 max
+  uint32 minimum_pce_svn = 2;  // should not exceed uint16 max
 
   // Unique vendor id of QE vendor
   bytes qe_vendor_id = 3;  // should be 16 bytes
@@ -53,7 +53,33 @@ message TDQuoteBodyPolicy {
   bytes report_data = 10;         // should be 64 bytes
 }
 
+// RootOfTrust represents configuration for which hardware root of trust
+// certificates to use for verifying attestation quote.
+message RootOfTrust {
+  // Paths to CA bundles for the Intel TDX.
+  // Must be in PEM format.
+  // If empty, uses the verification library's embedded certificates from Intel.
+  repeated string cabundle_paths = 1;
+
+  // PEM format CA bundles for Intel TDX. Combined with contents of
+  // cabundle_paths.
+  repeated string cabundles = 2;
+
+  // If true, download and check the CRL for revoked certificates.
+  bool check_crl = 3;
+
+  // If true, then check is not permitted to download necessary files for
+  // verification.
+  bool get_collateral = 4;
+}
+
+// Config is the overall message input for the check tool. This provides all
+// the flags that configure the tool, including the validation policy.
 message Config {
-  // The quote validation policy.
+  // The report validation policy.
   Policy policy = 1;
+
+  // Configures which hardware keys to trust. Default uses library-embedded
+  // certificate.
+  RootOfTrust root_of_trust = 2;
 }

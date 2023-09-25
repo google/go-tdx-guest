@@ -79,7 +79,7 @@ type TdQuoteBodyOptions struct {
 	MrOwner []byte
 	// MrOwnerConfig is the expected MR_OWNER_CONFIG field. Must be nil or 48 bytes long. Not checked if nil.
 	MrOwnerConfig []byte
-	// Rtmrs is the expected RTMRS field. Must be nil or 48*rtmrsCount. Not checked if nil.
+	// Rtmrs is the expected RTMRS field. Must be nil or 48 * rtmrsCount. Not checked if nil.
 	Rtmrs [][]byte
 	// ReportData is the expected REPORT_DATA field. Must be nil or 64 bytes long. Not checked if nil.
 	ReportData []byte
@@ -88,6 +88,22 @@ type TdQuoteBodyOptions struct {
 func lengthCheck(name string, length int, value []byte) error {
 	if value != nil && len(value) != length {
 		return fmt.Errorf("option %q length is %d. Want %d", name, len(value), length)
+	}
+	return nil
+}
+
+func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
+	if len(value) == 0 {
+		return nil
+	}
+	if len(value) != size {
+		return fmt.Errorf("option %q size is %d. Want %d", name, len(value), size)
+	}
+
+	for i := range value {
+		if len(value[i]) != 0 && len(value[i]) != length {
+			return fmt.Errorf("option %q[%d] length is %d. Want %d", name, i, len(value), length)
+		}
 	}
 	return nil
 }
@@ -101,20 +117,23 @@ func checkOptionsLengths(opts *Options) error {
 		lengthCheck("mr_config_id", abi.MrConfigIDSize, opts.TdQuoteBodyOptions.MrConfigID),
 		lengthCheck("mr_owner", abi.MrOwnerSize, opts.TdQuoteBodyOptions.MrOwner),
 		lengthCheck("mr_owner_config", abi.MrOwnerConfigSize, opts.TdQuoteBodyOptions.MrOwnerConfig),
-		lengthCheck("rtmr", abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs[0]),
-		lengthCheck("rtmr", abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs[1]),
-		lengthCheck("rtmr", abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs[2]),
-		lengthCheck("rtmr", abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs[3]),
 		lengthCheck("report_data", abi.ReportDataSize, opts.TdQuoteBodyOptions.ReportData),
 		lengthCheck("qe_vendor_id", abi.QeVendorIDSize, opts.HeaderOptions.QeVendorID),
+		lengthCheckRtmr("rtmrs", rtmrsCount, abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs),
 	)
 }
 
 // PolicyToOptions returns an Options object that is represented by a Policy message.
 func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
+	if policy.GetHeaderPolicy().GetMinimumQeSvn() > 65535 {
+		return nil, fmt.Errorf("minimum_qe_svn is %d. Expect 0-65535", policy.GetHeaderPolicy().GetMinimumQeSvn())
+	}
+	if policy.GetHeaderPolicy().GetMinimumPceSvn() > 65535 {
+		return nil, fmt.Errorf("minimum_pce_svn is %d. Expect 0-65535", policy.GetHeaderPolicy().GetMinimumPceSvn())
+	}
 	opts := &Options{
 		HeaderOptions: HeaderOptions{
-			MinimumQeSvn:  uint16(policy.GetHeaderPolicy().GetMinmumQeSvn()),
+			MinimumQeSvn:  uint16(policy.GetHeaderPolicy().GetMinimumQeSvn()),
 			MinimumPceSvn: uint16(policy.GetHeaderPolicy().GetMinimumPceSvn()),
 			QeVendorID:    policy.GetHeaderPolicy().GetQeVendorId(),
 		},
@@ -137,7 +156,7 @@ func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
 	return opts, nil
 }
 
-func byteCheckRtmr(field string, size int, given, required [][]byte) error {
+func byteCheckRtmr(size int, given, required [][]byte) error {
 	if len(required) == 0 {
 		return nil
 	}
@@ -145,12 +164,15 @@ func byteCheckRtmr(field string, size int, given, required [][]byte) error {
 		return fmt.Errorf("RTMR field size(%d) is not equal to expected size(4)", len(required))
 	}
 	for i := range required {
+		if len(required[i]) == 0 {
+			continue
+		}
 		if len(required[i]) != size {
 			return fmt.Errorf("RTMR[%d] should be 48 bytes, found %d", i, len(required[i]))
 		}
 		if !bytes.Equal(required[i], given[i]) {
-			return fmt.Errorf("quote field %s is %s. Expect %s",
-				field, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
+			return fmt.Errorf("quote field RTMR[%d] is %s. Expect %s",
+				i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		}
 	}
 	return nil
@@ -180,7 +202,7 @@ func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
 		byteCheck("MrConfigID", "MR_CONFIG_ID", abi.MrConfigIDSize, quote.GetTdQuoteBody().GetMrConfigId(), opts.TdQuoteBodyOptions.MrConfigID),
 		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, quote.GetTdQuoteBody().GetMrOwner(), opts.TdQuoteBodyOptions.MrOwner),
 		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, quote.GetTdQuoteBody().GetMrOwnerConfig(), opts.TdQuoteBodyOptions.MrOwnerConfig),
-		byteCheckRtmr("RTMRS", abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
+		byteCheckRtmr(abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
 		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, quote.GetTdQuoteBody().GetReportData(), opts.TdQuoteBodyOptions.ReportData),
 		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, quote.GetHeader().GetQeVendorId(), opts.HeaderOptions.QeVendorID),
 	)
@@ -203,8 +225,8 @@ func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
-	qeSvn := uint16(binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn()))
-	pceSvn := uint16(binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn()))
+	qeSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn())
+	pceSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn())
 	if qeSvn < opts.HeaderOptions.MinimumQeSvn {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			qeSvn, opts.HeaderOptions.MinimumQeSvn)
