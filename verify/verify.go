@@ -36,7 +36,7 @@ import (
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
-	cpb "github.com/google/go-tdx-guest/proto/check"
+	cpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/verify/trust"
 	"github.com/google/logger"

@@ -28,7 +28,7 @@ import (
 
 	"github.com/google/go-sev-guest/tools/lib/cmdline"
 	"github.com/google/go-tdx-guest/abi"
-	checkpb "github.com/google/go-tdx-guest/proto/check"
+	checkpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	testcases "github.com/google/go-tdx-guest/testing"
 	"github.com/google/go-tdx-guest/validate"

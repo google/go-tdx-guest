@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-tdx-guest/abi"
-	cpb "github.com/google/go-tdx-guest/proto/check"
+	cpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
 	"go.uber.org/multierr"

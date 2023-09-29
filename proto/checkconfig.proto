@@ -14,10 +14,10 @@
 
 syntax = "proto3";
 
-// Package check represents an attestation validation policy.
-package check;
+// Package checkconfig represents an attestation validation policy.
+package checkconfig;
 
-option go_package = "github.com/google/go-tdx-guest/proto/check";
+option go_package = "github.com/google/go-tdx-guest/proto/checkconfig";
 
 // Policy is a representation of an attestation quote validation policy.
 // Each field corresponds to a field on validate.Options. This format
