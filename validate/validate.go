@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-tdx-guest/abi"
-	cpb "github.com/google/go-tdx-guest/proto/checkconfig"
+	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
 	"go.uber.org/multierr"
@@ -124,7 +124,7 @@ func checkOptionsLengths(opts *Options) error {
 }
 
 // PolicyToOptions returns an Options object that is represented by a Policy message.
-func PolicyToOptions(policy *cpb.Policy) (*Options, error) {
+func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 	if policy.GetHeaderPolicy().GetMinimumQeSvn() > 65535 {
 		return nil, fmt.Errorf("minimum_qe_svn is %d. Expect 0-65535", policy.GetHeaderPolicy().GetMinimumQeSvn())
 	}
