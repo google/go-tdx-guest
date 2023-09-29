@@ -28,7 +28,7 @@ import (
 
 	"github.com/google/go-sev-guest/tools/lib/cmdline"
 	"github.com/google/go-tdx-guest/abi"
-	checkpb "github.com/google/go-tdx-guest/proto/check"
+	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	testcases "github.com/google/go-tdx-guest/testing"
 	"github.com/google/go-tdx-guest/validate"
@@ -108,9 +108,9 @@ var (
 	testLocalGetter = flag.Bool("test_local_getter", false, "Use this flag only to test this CLI tool when network access is not available")
 
 	// Assign the values of the flags to the corresponding proto fields
-	config = &checkpb.Config{
-		RootOfTrust: &checkpb.RootOfTrust{},
-		Policy:      &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}},
+	config = &ccpb.Config{
+		RootOfTrust: &ccpb.RootOfTrust{},
+		Policy:      &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}},
 	}
 )
 
@@ -220,10 +220,10 @@ func parseConfig(path string) error {
 	}
 	// Populate fields that should not be nil
 	if config.RootOfTrust == nil {
-		config.RootOfTrust = &checkpb.RootOfTrust{}
+		config.RootOfTrust = &ccpb.RootOfTrust{}
 	}
 	if config.Policy == nil {
-		config.Policy = &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}}
+		config.Policy = &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
 	}
 	return nil
 }

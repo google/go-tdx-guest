@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"testing"
 
-	checkpb "github.com/google/go-tdx-guest/proto/check"
+	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	"github.com/google/logger"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -30,7 +30,7 @@ import (
 
 // Returns true if the test should be skipped for the protobuf case since the field
 // can't be set to the expected value.
-type setterFn func(p *checkpb.Policy, value string, t *testing.T) bool
+type setterFn func(p *ccpb.Policy, value string, t *testing.T) bool
 
 // Represents a test case that will set a flag or config field to a good or bad value.
 // We use this data to check that
@@ -75,7 +75,7 @@ func withBaseArgs(config string, args ...string) []string {
 	return result
 }
 
-func setField(p *checkpb.Policy, policy string, name string, value any) {
+func setField(p *ccpb.Policy, policy string, name string, value any) {
 	if policy == "header_policy" {
 		s := p.HeaderPolicy
 		r := s.ProtoReflect()
@@ -90,7 +90,7 @@ func setField(p *checkpb.Policy, policy string, name string, value any) {
 }
 
 func bytesSetter(name string, policy string) setterFn {
-	return func(p *checkpb.Policy, value string, t *testing.T) bool {
+	return func(p *ccpb.Policy, value string, t *testing.T) bool {
 		v, err := hex.DecodeString(value)
 		if err != nil {
 			return true
@@ -101,7 +101,7 @@ func bytesSetter(name string, policy string) setterFn {
 }
 
 func uint32setter(name string, policy string) setterFn {
-	return func(p *checkpb.Policy, value string, t *testing.T) bool {
+	return func(p *ccpb.Policy, value string, t *testing.T) bool {
 		u, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return true
@@ -217,8 +217,8 @@ func withTempFile(contents []byte, t *testing.T, runner func(path string)) {
 	runner(file.Name())
 }
 
-func withTestConfig(p *checkpb.Policy, t *testing.T, runner func(path string)) {
-	config := &checkpb.Config{Policy: p}
+func withTestConfig(p *ccpb.Policy, t *testing.T, runner func(path string)) {
+	config := &ccpb.Config{Policy: p}
 
 	out, err := proto.Marshal(config)
 	if err != nil {
@@ -284,7 +284,7 @@ func TestRtmrs(t *testing.T) {
 func TestCheckGoodFields(t *testing.T) {
 	for _, tc := range testCases() {
 		t.Run(tc.flag, func(t *testing.T) {
-			p := &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}}
+			p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
 			if tc.setter(p, tc.good, t) {
 				t.Fatal("unexpected parse failure")
 			}
@@ -302,7 +302,7 @@ func TestCheckBadFields(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
 				if tc.setter(p, bad, t) {
 					return
 				}
@@ -321,7 +321,7 @@ func TestCheckGoodFlagOverridesBadField(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
 				if tc.setter(p, bad, t) {
 					return
 				}
@@ -340,7 +340,7 @@ func TestCheckBadFlagOverridesGoodField(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &checkpb.Policy{HeaderPolicy: &checkpb.HeaderPolicy{}, TdQuoteBodyPolicy: &checkpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
 				if tc.setter(p, tc.good, t) {
 					t.Fatal("unexpected parse failure")
 				}

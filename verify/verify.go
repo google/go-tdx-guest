@@ -36,7 +36,7 @@ import (
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
-	cpb "github.com/google/go-tdx-guest/proto/check"
+	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/verify/trust"
 	"github.com/google/logger"
@@ -1214,7 +1214,7 @@ func RawTdxQuote(raw []byte, options *Options) error {
 	return TdxQuote(quote, options)
 }
 
-func getTrustedRoots(rot *cpb.RootOfTrust) (*x509.CertPool, error) {
+func getTrustedRoots(rot *ccpb.RootOfTrust) (*x509.CertPool, error) {
 	if len(rot.CabundlePaths) == 0 && len(rot.Cabundles) == 0 {
 		return nil, nil
 	}
@@ -1239,7 +1239,7 @@ func getTrustedRoots(rot *cpb.RootOfTrust) (*x509.CertPool, error) {
 
 // RootOfTrustToOptions translates the RootOfTrust message into the Options type needed
 // for driving an attestation verification.
-func RootOfTrustToOptions(rot *cpb.RootOfTrust) (*Options, error) {
+func RootOfTrustToOptions(rot *ccpb.RootOfTrust) (*Options, error) {
 	trustedRoots, err := getTrustedRoots(rot)
 	if err != nil {
 		return nil, err

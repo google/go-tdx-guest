@@ -47,4 +47,4 @@
 package proto
 
 //go:generate protoc -I$PROTOC_INSTALL_DIR/include -I=. --go_out=. --go_opt=module=github.com/google/go-tdx-guest/proto tdx.proto
-//go:generate protoc -I$PROTOC_INSTALL_DIR/include -I=. --go_out=. --go_opt=module=github.com/google/go-tdx-guest/proto check.proto
+//go:generate protoc -I$PROTOC_INSTALL_DIR/include -I=. --go_out=. --go_opt=module=github.com/google/go-tdx-guest/proto checkconfig.proto
