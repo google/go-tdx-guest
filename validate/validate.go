@@ -289,17 +289,6 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	)
 }
 
-// RawTdxQuoteValidate checks the raw bytes representation of an attestation quote.
-//
-// Deprecated: Use RawTdxQuote instead. This function is no longer recommended for use.
-func RawTdxQuoteValidate(raw []byte, options *Options) error {
-	quote, err := abi.QuoteToProto(raw)
-	if err != nil {
-		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
-	}
-	return TdxQuote(quote, options)
-}
-
 // RawTdxQuote checks the raw bytes representation of an attestation quote.
 func RawTdxQuote(raw []byte, options *Options) error {
 	quote, err := abi.QuoteToProto(raw)
