@@ -366,10 +366,15 @@ func populateConfig() error {
 }
 
 func main() {
-	logger.Init("", *verbose, false, os.Stderr)
+	logger.Init("", false, false, os.Stderr)
 	flag.Parse()
 	cmdline.Parse("auto")
 
+	if *verbose {
+		logger.SetLevel(1)
+	}
+
+	logger.V(1).Info("Parsing input parameters")
 	if err := parseConfig(*configProto); err != nil {
 		die(err)
 	}
@@ -385,10 +390,13 @@ func main() {
 	if err != nil {
 		die(err)
 	}
+	logger.V(1).Info("Quote parsed successfully")
+
 	sopts, err := verify.RootOfTrustToOptions(config.RootOfTrust)
 	if err != nil {
 		die(err)
 	}
+	logger.V(1).Info("Input parameters parsed successfully")
 
 	var getter trust.HTTPSGetter
 	getter = &trust.SimpleHTTPSGetter{}
@@ -400,6 +408,8 @@ func main() {
 		MaxRetryDelay: *maxRetryDelay,
 		Getter:        getter,
 	}
+
+	logger.V(1).Info("Verifying the TDX quote from input")
 	if err := verify.TdxQuote(quote, sopts); err != nil {
 		// Make the exit code more helpful when there are network errors
 		// that affected the result.
@@ -422,6 +432,7 @@ func main() {
 		}
 		dieWith(fmt.Errorf("could not verify the quote: %v", err), exitCode)
 	}
+	logger.V(1).Info("Quote verified successfully")
 
 	opts, err := validate.PolicyToOptions(config.Policy)
 	if err != nil {
@@ -430,4 +441,5 @@ func main() {
 	if err := validate.TdxQuote(quote, opts); err != nil {
 		dieWith(fmt.Errorf("error validating quote: %v", err), exitPolicy)
 	}
+	logger.V(1).Info("Quote validated successfully")
 }
