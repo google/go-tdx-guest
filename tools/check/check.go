@@ -429,7 +429,7 @@ func main() {
 		}
 		dieWith(fmt.Errorf("could not verify the quote: %v", err), exitCode)
 	}
-	logger.V(1).Info("Quote verified successfully")
+	logger.Info("Quote verified successfully")
 
 	opts, err := validate.PolicyToOptions(config.Policy)
 	if err != nil {
