@@ -117,7 +117,7 @@ var (
 func parseQuoteBytes(b []byte) (*pb.QuoteV4, error) {
 	quote, err := abi.QuoteToProto(b)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse the quote from %q: %v", *infile, err)
+		return nil, fmt.Errorf("could not parse the TDX Quote from %q: %v", *infile, err)
 	}
 
 	return quote, nil
@@ -192,7 +192,7 @@ func readQuote() (*pb.QuoteV4, error) {
 
 func dieWith(err error, exitCode int) {
 	if !*quiet {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "FATAL: %v\n", err)
 	}
 	os.Exit(exitCode)
 }
@@ -366,7 +366,7 @@ func populateConfig() error {
 }
 
 func main() {
-	logger.Init("", false, false, os.Stderr)
+	logger.Init("", false, false, os.Stdout)
 	flag.Parse()
 	cmdline.Parse("auto")
 	logger.SetLevel(logger.Level(*verbose))
@@ -387,7 +387,7 @@ func main() {
 	if err != nil {
 		die(err)
 	}
-	logger.V(1).Info("Quote parsed successfully")
+	logger.V(1).Info("TDX Quote parsed successfully")
 
 	sopts, err := verify.RootOfTrustToOptions(config.RootOfTrust)
 	if err != nil {
@@ -406,7 +406,7 @@ func main() {
 		Getter:        getter,
 	}
 
-	logger.V(1).Info("Verifying the TDX quote from input")
+	logger.V(1).Info("Verifying the TDX Quote from input")
 	if err := verify.TdxQuote(quote, sopts); err != nil {
 		// Make the exit code more helpful when there are network errors
 		// that affected the result.
@@ -427,16 +427,16 @@ func main() {
 		if !clarify(err) {
 			clarify(errors.Unwrap(err))
 		}
-		dieWith(fmt.Errorf("could not verify the quote: %v", err), exitCode)
+		dieWith(fmt.Errorf("could not verify the TDX Quote: %v", err), exitCode)
 	}
-	logger.Info("Quote verified successfully")
+	logger.Info("TDX Quote verified successfully")
 
 	opts, err := validate.PolicyToOptions(config.Policy)
 	if err != nil {
 		die(err)
 	}
 	if err := validate.TdxQuote(quote, opts); err != nil {
-		dieWith(fmt.Errorf("error validating quote: %v", err), exitPolicy)
+		dieWith(fmt.Errorf("error validating TDX Quote: %v", err), exitPolicy)
 	}
-	logger.V(1).Info("Quote validated successfully")
+	logger.V(1).Info("TDX Quote validated successfully")
 }

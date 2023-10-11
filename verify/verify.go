@@ -1204,5 +1204,5 @@ func init() {
 	trustedRootCertificate, _ = x509.ParseCertificate(root.Bytes)
 
 	// Initialize logger
-	logger.Init("", false, false, os.Stderr)
+	logger.Init("", false, false, os.Stdout)
 }
