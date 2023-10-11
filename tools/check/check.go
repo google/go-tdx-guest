@@ -67,7 +67,7 @@ var (
 			" overwrite the message's associated field. By default, the file will be unmarshalled as binary," +
 			" but if it ends in .textproto, it will be unmarshalled as prototext instead."))
 	quiet   = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
-	verbose = flag.Bool("verbose", false, "Enable verbose logging.")
+	verbose = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output")
 
 	qevendoridS    = flag.String("qe_vendor_id", "", "The expected QE_VENDOR_ID field as a hex string. Must encode 16 bytes. Unchecked if unset.")
 	qevendorid     = cmdline.Bytes("-qe_vendor_id", abi.QeVendorIDSize, qevendoridS)
@@ -117,7 +117,7 @@ var (
 func parseQuoteBytes(b []byte) (*pb.QuoteV4, error) {
 	quote, err := abi.QuoteToProto(b)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse the quote from %q: %v", *infile, err)
+		return nil, fmt.Errorf("could not parse the TDX Quote from %q: %v", *infile, err)
 	}
 
 	return quote, nil
@@ -192,7 +192,7 @@ func readQuote() (*pb.QuoteV4, error) {
 
 func dieWith(err error, exitCode int) {
 	if !*quiet {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+		fmt.Fprintf(os.Stderr, "FATAL: %v\n", err)
 	}
 	os.Exit(exitCode)
 }
@@ -366,10 +366,12 @@ func populateConfig() error {
 }
 
 func main() {
-	logger.Init("", *verbose, false, os.Stderr)
+	logger.Init("", false, false, os.Stdout)
 	flag.Parse()
 	cmdline.Parse("auto")
+	logger.SetLevel(logger.Level(*verbose))
 
+	logger.V(1).Info("Parsing input parameters")
 	if err := parseConfig(*configProto); err != nil {
 		die(err)
 	}
@@ -385,10 +387,13 @@ func main() {
 	if err != nil {
 		die(err)
 	}
+	logger.V(1).Info("TDX Quote parsed successfully")
+
 	sopts, err := verify.RootOfTrustToOptions(config.RootOfTrust)
 	if err != nil {
 		die(err)
 	}
+	logger.V(1).Info("Input parameters parsed successfully")
 
 	var getter trust.HTTPSGetter
 	getter = &trust.SimpleHTTPSGetter{}
@@ -400,6 +405,8 @@ func main() {
 		MaxRetryDelay: *maxRetryDelay,
 		Getter:        getter,
 	}
+
+	logger.V(1).Info("Verifying the TDX Quote from input")
 	if err := verify.TdxQuote(quote, sopts); err != nil {
 		// Make the exit code more helpful when there are network errors
 		// that affected the result.
@@ -420,14 +427,16 @@ func main() {
 		if !clarify(err) {
 			clarify(errors.Unwrap(err))
 		}
-		dieWith(fmt.Errorf("could not verify the quote: %v", err), exitCode)
+		dieWith(fmt.Errorf("could not verify the TDX Quote: %v", err), exitCode)
 	}
+	logger.Info("TDX Quote verified successfully")
 
 	opts, err := validate.PolicyToOptions(config.Policy)
 	if err != nil {
 		die(err)
 	}
 	if err := validate.TdxQuote(quote, opts); err != nil {
-		dieWith(fmt.Errorf("error validating quote: %v", err), exitPolicy)
+		dieWith(fmt.Errorf("error validating the TDX Quote: %v", err), exitPolicy)
 	}
+	logger.V(1).Info("TDX Quote validated successfully")
 }
