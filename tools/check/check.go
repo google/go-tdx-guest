@@ -436,7 +436,7 @@ func main() {
 		die(err)
 	}
 	if err := validate.TdxQuote(quote, opts); err != nil {
-		dieWith(fmt.Errorf("error validating TDX Quote: %v", err), exitPolicy)
+		dieWith(fmt.Errorf("error validating the TDX Quote: %v", err), exitPolicy)
 	}
 	logger.V(1).Info("TDX Quote validated successfully")
 }
