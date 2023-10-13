@@ -271,10 +271,10 @@ func bytesToEcdsaPubKey(b []byte) (*ecdsa.PublicKey, error) {
 		Y:     new(big.Int).SetBytes(b[pubKeySize/2 : pubKeySize]),
 	}
 
+	logger.V(2).Info("Public Key is on curve ", publicKey.Curve.Params().Name)
 	if !publicKey.Curve.IsOnCurve(publicKey.X, publicKey.Y) {
 		return nil, fmt.Errorf("public key is not on curve %q", publicKey.Curve.Params().Name)
 	}
-	logger.V(2).Info("Public Key is on curve ", publicKey.Curve.Params().Name)
 	return publicKey, nil
 }
 
@@ -646,28 +646,30 @@ func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 }
 
 func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x509.SignatureAlgorithm, publicKeyAlgorithm x509.PublicKeyAlgorithm, curve string) error {
+
+	logger.V(2).Info("Certificate version: ", cert.Version)
 	if cert.Version != version {
 		return fmt.Errorf("certificate's version found %v. Expected %d", cert.Version, version)
 	}
-	logger.V(2).Info("Certificate version: ", cert.Version)
 
+	logger.V(2).Info("Certicate's signature algorithm: ", cert.SignatureAlgorithm)
 	if cert.SignatureAlgorithm != signatureAlgorithm {
 		return fmt.Errorf("certificate's signature algorithm found %v. Expected %v", cert.SignatureAlgorithm, signatureAlgorithm)
 	}
-	logger.V(2).Info("Certicate's signature algorithm: ", cert.SignatureAlgorithm)
 
+	logger.V(2).Info("Certicate's public key algorithm: ", cert.PublicKeyAlgorithm)
 	if cert.PublicKeyAlgorithm != publicKeyAlgorithm {
 		return fmt.Errorf("certificate's public Key algorithm found %v. Expected %v", cert.PublicKeyAlgorithm, publicKeyAlgorithm)
 	}
-	logger.V(2).Info("Certicate's public key algorithm: ", cert.PublicKeyAlgorithm)
 
 	// Locally bind the public key any type to allow for occurrence typing in the switch statement.
 	switch pub := cert.PublicKey.(type) {
 	case *ecdsa.PublicKey:
+		logger.V(2).Info("Certificate's public key curve: ", pub.Curve.Params().Name)
 		if pub.Curve.Params().Name != curve {
 			return fmt.Errorf("certificate's public key curve is %q. Expected %q", pub.Curve.Params().Name, curve)
 		}
-		logger.V(2).Info("Certificate's public key curve: ", pub.Curve.Params().Name)
+
 	default:
 		return ErrCertPubKeyType
 	}
@@ -689,15 +691,15 @@ func validateCertificate(cert *x509.Certificate, parent *x509.Certificate, phras
 		return err
 	}
 
+	logger.V(2).Info("Certificate's subject name found: ", cert.Subject.CommonName)
 	if cert.Subject.CommonName != phrase {
 		return fmt.Errorf("%q is not expected in certificate's subject name. Expected %q", cert.Subject.CommonName, phrase)
 	}
-	logger.V(2).Info("Certificate's subject name found: ", cert.Subject.CommonName)
 
+	logger.V(2).Info("Certificate's issuer name found: ", cert.Issuer.String())
 	if cert.Issuer.String() != parent.Subject.String() {
 		return fmt.Errorf("certificate's issuer name (%q), does not match with parent certificate's subject name (%q)", cert.Issuer.String(), parent.Subject.String())
 	}
-	logger.V(2).Info("Certificate's issuer name found: ", cert.Issuer.String())
 
 	if err := cert.CheckSignatureFrom(parent); err != nil {
 		return fmt.Errorf("certificate signature verification using parent certificate failed: %v", err)
@@ -714,10 +716,10 @@ func validateCRL(crl *x509.RevocationList, trustedCertificate *x509.Certificate)
 		return ErrTrustedCertEmpty
 	}
 
+	logger.V(2).Info("CRL issuer's name found: ", crl.Issuer.String())
 	if crl.Issuer.String() != trustedCertificate.Subject.String() {
 		return fmt.Errorf("CRL issuer's name %q does not match with expected name %q", crl.Issuer.String(), trustedCertificate.Subject.String())
 	}
-	logger.V(2).Info("CRL issuer's name found: ", crl.Issuer.String())
 
 	if err := crl.CheckSignatureFrom(trustedCertificate); err != nil {
 		return fmt.Errorf("CRL signature verification failed using trusted certificate: %v", err)
@@ -1222,11 +1224,12 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	}
 
 	logger.V(1).Info("Checking that the quote parameters meet the required size")
+	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
+	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
+
 	if err := abi.CheckQuoteV4(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
-	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
-	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
 	logger.V(1).Info("Quote parameters meet the required size")
 
 	logger.V(1).Info("Extracting PCK certificate chain from the quote")
