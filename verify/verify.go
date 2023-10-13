@@ -986,7 +986,7 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 	if err != nil {
 		return fmt.Errorf("attestation key in the quote is invalid: %v", err)
 	}
-	logger.V(1).Info("Attestation key extracted succesfully from the quote")
+	logger.V(1).Info("Attestation key extracted successfully from the quote")
 
 	logger.V(1).Info("Extracting signature present in the quote")
 	signature := quote.GetSignedData().GetSignature()
