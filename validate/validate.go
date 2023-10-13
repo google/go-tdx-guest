@@ -288,7 +288,7 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 	if tdAttributes&(^fixed0) != 0 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed0 0x%x bits are set", tdAttributes, fixed0)
 	}
-	logger.V(1).Info("Successfully validated Td Attributes field")
+	logger.V(1).Info("Successfully validated TdAttributes field")
 	return nil
 }
 

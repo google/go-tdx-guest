@@ -551,7 +551,7 @@ func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) er
 	if currentTime.After(chain.PCKCertificate.NotAfter) {
 		return ErrPckLeafCertExpired
 	}
-	logger.V(1).Info("Certificates have not expired")
+	logger.V(1).Info("Certificates are up-to-date")
 	return nil
 }
 
@@ -649,17 +649,17 @@ func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x5
 	if cert.Version != version {
 		return fmt.Errorf("certificate's version found %v. Expected %d", cert.Version, version)
 	}
-	logger.V(2).Info("Certificate version found: ", cert.Version)
+	logger.V(2).Info("Certificate version: ", cert.Version)
 
 	if cert.SignatureAlgorithm != signatureAlgorithm {
 		return fmt.Errorf("certificate's signature algorithm found %v. Expected %v", cert.SignatureAlgorithm, signatureAlgorithm)
 	}
-	logger.V(2).Info("Certicate's signature algorithm found: ", cert.SignatureAlgorithm)
+	logger.V(2).Info("Certicate's signature algorithm: ", cert.SignatureAlgorithm)
 
 	if cert.PublicKeyAlgorithm != publicKeyAlgorithm {
 		return fmt.Errorf("certificate's public Key algorithm found %v. Expected %v", cert.PublicKeyAlgorithm, publicKeyAlgorithm)
 	}
-	logger.V(2).Info("Certicate's public key algorithm found: ", cert.PublicKeyAlgorithm)
+	logger.V(2).Info("Certicate's public key algorithm: ", cert.PublicKeyAlgorithm)
 
 	// Locally bind the public key any type to allow for occurrence typing in the switch statement.
 	switch pub := cert.PublicKey.(type) {
@@ -667,7 +667,7 @@ func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x5
 		if pub.Curve.Params().Name != curve {
 			return fmt.Errorf("certificate's public key curve is %q. Expected %q", pub.Curve.Params().Name, curve)
 		}
-		logger.V(2).Info("Certificate's public key curve found: ", pub.Curve.Params().Name)
+		logger.V(2).Info("Certificate's public key curve: ", pub.Curve.Params().Name)
 	default:
 		return ErrCertPubKeyType
 	}
