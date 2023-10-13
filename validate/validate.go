@@ -237,7 +237,7 @@ func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
-	logger.V(2).Infof("TEE TCB security-version number(%v) is not less than minimum_tee_tcb_svn value(%v)", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
+	logger.V(2).Infof("TEE TCB security-version number(%v) is greater than or equal to minimum_tee_tcb_svn value(%v)", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	logger.V(1).Info("Successfully validated TEE TCB security-version number")
 	qeSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn())
 	pceSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn())
@@ -245,13 +245,13 @@ func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	}
-	logger.V(2).Infof("QE security-version number(%d) is not less than minimum_qe_svn value(%d)", qeSvn, opts.HeaderOptions.MinimumQeSvn)
+	logger.V(2).Infof("QE security-version number(%d) is greater than or equal to minimum_qe_svn value(%d)", qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	logger.V(1).Info("Successfully validated QE security-version number")
 	if pceSvn < opts.HeaderOptions.MinimumPceSvn {
 		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
 			pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	}
-	logger.V(2).Infof("PCE security-version number(%d) is not less than minimum_pce_svn value(%d)", pceSvn, opts.HeaderOptions.MinimumPceSvn)
+	logger.V(2).Infof("PCE security-version number(%d) is greater than or equal to minimum_pce_svn value(%d)", pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	logger.V(1).Info("Successfully validated PCE security-version number")
 	return nil
 }
