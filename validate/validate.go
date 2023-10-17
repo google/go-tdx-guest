@@ -271,6 +271,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 		return fmt.Errorf("xfam size is invalid")
 	}
 	xfam := binary.LittleEndian.Uint64(value[:])
+	logger.V(2).Infof("XFAM value is %v, XFAMFixed0 value is %v and XFAMFixed1 value is %v", xfam, fixed0, fixed1)
 	if xfam&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized xfam 0x%x as xfamFixed1 0x%x bits are unset", xfam, fixed1)
 	}
@@ -289,6 +290,7 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 		return fmt.Errorf("tdAttributes size is invalid")
 	}
 	tdAttributes := binary.LittleEndian.Uint64(value[:])
+	logger.V(2).Infof("TdAttributes value is %v, TdAttributesFixed0 value is %v and TdAttributesFixed1 value is %v", tdAttributes, fixed0, fixed1)
 	if tdAttributes&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed1 0x%x bits are unset", tdAttributes, fixed1)
 	}
