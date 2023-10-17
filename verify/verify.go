@@ -669,7 +669,6 @@ func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x5
 		if pub.Curve.Params().Name != curve {
 			return fmt.Errorf("certificate's public key curve is %q. Expected %q", pub.Curve.Params().Name, curve)
 		}
-
 	default:
 		return ErrCertPubKeyType
 	}
