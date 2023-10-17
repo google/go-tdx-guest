@@ -1120,7 +1120,6 @@ func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, sig
 				}
 			}
 			logger.V(1).Info("Root certificate is not revoked by the signing certificate")
-
 		} else {
 			return ErrRevocationCheckFailed
 		}
@@ -1211,7 +1210,6 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 			return err
 		}
 		logger.V(1).Info("QE Identity API response verified successfully")
-
 		logger.V(1).Info("Collaterals verified successfully")
 	}
 
