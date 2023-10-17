@@ -904,30 +904,30 @@ func checkTcbInfoTcbStatus(tcbLevels []pcs.TcbLevel, tdQuoteBody *pb.TDQuoteBody
 }
 
 func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteBodyOptions) error {
+	logger.V(2).Infof("FMSPC from PCK Certificate is %q, and FMSPC value from PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	if tdQuoteBodyOptions.pckCertExtensions.FMSPC != tdQuoteBodyOptions.tcbInfo.Fmspc {
 		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	}
-	logger.V(2).Infof("FMSPC from PCK Certificate(%q) is equal to FMSPC value from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 
+	logger.V(2).Infof("PCEID from PCK Certificate is %q, and PCEID from PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	if tdQuoteBodyOptions.pckCertExtensions.PCEID != tdQuoteBodyOptions.tcbInfo.PceID {
 		return fmt.Errorf("PCEID from PCK Certificate(%q) is not equal to PCEID from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	}
-	logger.V(2).Infof("PCEID from PCK Certificate(%q) is equal to PCEID from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 
+	logger.V(2).Infof("MRSIGNERSEAM value from TD Quote Body is %q, and TdxModule.Mrsigner field in PCS's reported TDX TCB info is %q", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes, tdQuoteBody.GetMrSignerSeam()) {
 		return fmt.Errorf("MRSIGNERSEAM value from TD Quote Body(%q) is not equal to TdxModule.Mrsigner field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	}
-	logger.V(2).Infof("MRSIGNERSEAM value from TD Quote Body(%q) is equal to TdxModule.Mrsigner field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 
 	if len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes) != len(tdQuoteBody.GetSeamAttributes()) {
 		return fmt.Errorf("size of SeamAttributes from TD Quote Body(%d) is not equal to size of TdxModule.AttributesMask in PCS's reported TDX TCB info(%d)", len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes), len(tdQuoteBody.GetSeamAttributes()))
 	}
 	attributesMask := applyMask(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes, tdQuoteBody.GetSeamAttributes())
 
+	logger.V(2).Infof("AttributesMask value is %q, and TdxModule.Attributes field in PCS's reported TDX TCB info is %q", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes, attributesMask) {
 		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	}
-	logger.V(2).Infof("AttributesMask value(%q) is equal to TdxModule.Attributes field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 
 	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo.TcbLevels, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
 		return fmt.Errorf("PCS's reported TDX TCB info failed TCB status check: %v", err)
@@ -946,30 +946,31 @@ func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions
 	miscSelectMask := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.MiscselectMask.Bytes)
 	miscSelect := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.Miscselect.Bytes)
 	miscSelectMask = qeReport.GetMiscSelect() & miscSelectMask
+
+	logger.V(2).Infof("MISCSELECT value from PCS's reported QE Identity is %v, and MISCSELECTMask value is %v", miscSelect, miscSelectMask)
 	if miscSelectMask != miscSelect {
 		return fmt.Errorf("MISCSELECT value(%v) from PCS's reported QE Identity is not equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
 	}
-	logger.V(2).Infof("MISCSELECT value(%v) from PCS's reported QE Identity is equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
 
 	if len(qeReportOptions.qeIdentity.AttributesMask.Bytes) != len(qeReport.GetAttributes()) {
 		return fmt.Errorf("size of AttributesMask value(%d) in PCS's reported QE Identity is not equal to size of SeamAttributes value(%d) in QE Report", len(qeReportOptions.qeIdentity.AttributesMask.Bytes), len(qeReport.GetAttributes()))
 	}
 	qeAttributesMask := applyMask(qeReportOptions.qeIdentity.AttributesMask.Bytes, qeReport.GetAttributes())
 
+	logger.V(2).Infof("AttributesMask value is %v, and Attributes value in PCS's reported QE Identity is %v", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Attributes.Bytes, qeAttributesMask) {
 		return fmt.Errorf("AttributesMask value(%v) is not equal to Attributes value(%v) in PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	}
-	logger.V(2).Infof("AttributesMask value(%v) is equal to Attributes value(%v) in PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 
+	logger.V(2).Infof("MRSIGNER value in QE Report is %q, and MRSIGNER value in PCS's reported QE Identity is %q", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Mrsigner.Bytes, qeReport.GetMrSigner()) {
 		return fmt.Errorf("MRSIGNER value(%q) in QE Report is not equal to MRSIGNER value(%q) in PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	}
-	logger.V(2).Infof("MRSIGNER value(%q) in QE Report is equal to MRSIGNER value(%q) in PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 
+	logger.V(2).Infof("ISV PRODID value in QE Report is %v, and ISV PRODID value in PCS's reported QE Identity is %v", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	if qeReport.GetIsvProdId() != uint32(qeReportOptions.qeIdentity.IsvProdID) {
 		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	}
-	logger.V(2).Infof("ISV PRODID value(%v) in QE Report is equal to ISV PRODID value(%v) in PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 
 	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err != nil {
 		return fmt.Errorf("PCS's reported QE Identity failed TCB status check: %v", err)
@@ -1133,15 +1134,16 @@ func verifyTCBinfo(options *Options) error {
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	signature := collateral.TdxTcbInfo.Signature
 
+	logger.V(2).Infof("TcbInfo ID is %q, and expected ID is %q", tcbInfo.ID, tcbInfoID)
 	if tcbInfo.ID != tcbInfoID {
 		return fmt.Errorf("tcbInfo ID %q does not match with expected ID %q", tcbInfo.ID, tcbInfoID)
 	}
-	logger.V(2).Infof("TcbInfo ID %q matches with expected ID %q", tcbInfo.ID, tcbInfoID)
 
+	logger.V(2).Infof("TcbInfo version is %v, and expected version is %v", tcbInfo.Version, tcbInfoVersion)
 	if tcbInfo.Version != tcbInfoVersion {
 		return fmt.Errorf("tcbInfo version %v does not match with expected version %v", tcbInfo.Version, tcbInfoVersion)
 	}
-	logger.V(2).Infof("TcbInfo version %v matches with expected version %v", tcbInfo.Version, tcbInfoVersion)
+
 	if len(tcbInfo.TcbLevels) == 0 {
 		return ErrTcbInfoTcbLevelsMissing
 	}
@@ -1160,15 +1162,16 @@ func verifyQeIdentity(options *Options) error {
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
 	signature := collateral.QeIdentity.Signature
 
+	logger.V(2).Infof("QeIdentity ID is %q, and expected ID is %q", qeIdentity.ID, qeIdentityID)
 	if qeIdentity.ID != qeIdentityID {
 		return fmt.Errorf("QeIdentity ID %q does not match with expected ID %q", qeIdentity.ID, qeIdentityID)
 	}
-	logger.V(2).Infof("QeIdentity ID %q matches with expected ID %q", qeIdentity.ID, qeIdentityID)
 
+	logger.V(2).Infof("QeIdentity version is %v, and expected version is %v", qeIdentity.Version, qeIdentityVersion)
 	if qeIdentity.Version != qeIdentityVersion {
 		return fmt.Errorf("QeIdentity version %v does not match with expected version %v", qeIdentity.Version, qeIdentityVersion)
 	}
-	logger.V(2).Infof("QeIdentity version %v matches with expected version %v", qeIdentity.Version, qeIdentityVersion)
+
 	if len(qeIdentity.TcbLevels) == 0 {
 		return ErrQeIdentityTcbLevelsMissing
 	}

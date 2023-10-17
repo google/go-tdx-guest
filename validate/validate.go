@@ -173,11 +173,13 @@ func byteCheckRtmr(size int, given, required [][]byte) error {
 		if len(required[i]) != size {
 			return fmt.Errorf("RTMR[%d] should be 48 bytes, found %d", i, len(required[i]))
 		}
+
+		logger.V(2).Infof("Quote field RTMR[%d] value is %s, and expected value is %s", i+1, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		if !bytes.Equal(required[i], given[i]) {
 			return fmt.Errorf("quote field RTMR[%d] is %s. Expect %s",
 				i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		}
-		logger.V(2).Infof("Quote field RTMR[%d] matches the input value %v", i+1, given)
+
 		logger.V(1).Infof("Successfully validated RTMR[%d] field", i+1)
 	}
 	return nil
@@ -191,11 +193,13 @@ func byteCheck(option, field string, size int, given, required []byte) error {
 	if len(required) != size {
 		return fmt.Errorf("option %v must be nil or %d bytes", option, size)
 	}
+
+	logger.V(2).Infof("Quote field %s value is %s, and expected value is %s", field, hex.EncodeToString(given), hex.EncodeToString(required))
 	if !bytes.Equal(required, given) {
 		return fmt.Errorf("quote field %s is %s. Expect %s",
 			field, hex.EncodeToString(given), hex.EncodeToString(required))
 	}
-	logger.V(2).Infof("Quote field %s matches the input value %v", field, given)
+
 	logger.V(1).Infof("Successfully validated %s field", field)
 	return nil
 }
@@ -233,25 +237,28 @@ func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 	logger.V(1).Info("Setting the minimum_pce_svn parameter value to ", opts.HeaderOptions.MinimumPceSvn)
 	logger.V(1).Info("Setting the minimum_tee_tcb_svn parameter value to ", opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 
+	logger.V(2).Infof("TEE TCB security-version number is %v, and minimum_tee_tcb_svn value is %v", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	if !isSvnHigherOrEqual(quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
-	logger.V(2).Infof("TEE TCB security-version number(%v) is greater than or equal to minimum_tee_tcb_svn value(%v)", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
+
 	logger.V(1).Info("Successfully validated TEE TCB security-version number")
 	qeSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn())
 	pceSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn())
+	logger.V(2).Infof("QE security-version number is %d, and minimum_qe_svn value is %d", qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	if qeSvn < opts.HeaderOptions.MinimumQeSvn {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	}
-	logger.V(2).Infof("QE security-version number(%d) is greater than or equal to minimum_qe_svn value(%d)", qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	logger.V(1).Info("Successfully validated QE security-version number")
+
+	logger.V(2).Infof("PCE security-version number is %d, and minimum_pce_svn value is %d", pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	if pceSvn < opts.HeaderOptions.MinimumPceSvn {
 		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
 			pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	}
-	logger.V(2).Infof("PCE security-version number(%d) is greater than or equal to minimum_pce_svn value(%d)", pceSvn, opts.HeaderOptions.MinimumPceSvn)
+
 	logger.V(1).Info("Successfully validated PCE security-version number")
 	return nil
 }
