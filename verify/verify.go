@@ -929,7 +929,7 @@ func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteB
 	}
 
 	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo.TcbLevels, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
-		return fmt.Errorf("Intel PCS's reported TDX TCB info failed TCB status check: %v", err)
+		return fmt.Errorf("TDX TCB info reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
 }
@@ -972,7 +972,7 @@ func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions
 	}
 
 	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err != nil {
-		return fmt.Errorf("Intel PCS's reported QE Identity failed TCB status check: %v", err)
+		return fmt.Errorf("QE Identity reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
 }
