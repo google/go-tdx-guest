@@ -347,7 +347,7 @@ func bodyToRawMessage(name string, body []byte) ([]byte, error) {
 
 func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) error {
 	pckCrlURL := pcs.PckCrlURL(ca)
-	logger.V(2).Info("Getting PCK CRL:", pckCrlURL)
+	logger.V(2).Info("Getting PCK CRL: ", pckCrlURL)
 	header, body, err := getter.Get(pckCrlURL)
 	if err != nil {
 		return CRLUnavailableErr{multierr.Append(err, errors.New("could not fetch PCK CRL"))}
@@ -652,12 +652,12 @@ func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x5
 		return fmt.Errorf("certificate's version found %v. Expected %d", cert.Version, version)
 	}
 
-	logger.V(2).Info("Certicate's signature algorithm: ", cert.SignatureAlgorithm)
+	logger.V(2).Info("Certificate's signature algorithm: ", cert.SignatureAlgorithm)
 	if cert.SignatureAlgorithm != signatureAlgorithm {
 		return fmt.Errorf("certificate's signature algorithm found %v. Expected %v", cert.SignatureAlgorithm, signatureAlgorithm)
 	}
 
-	logger.V(2).Info("Certicate's public key algorithm: ", cert.PublicKeyAlgorithm)
+	logger.V(2).Info("Certificate's public key algorithm: ", cert.PublicKeyAlgorithm)
 	if cert.PublicKeyAlgorithm != publicKeyAlgorithm {
 		return fmt.Errorf("certificate's public Key algorithm found %v. Expected %v", cert.PublicKeyAlgorithm, publicKeyAlgorithm)
 	}
@@ -903,33 +903,33 @@ func checkTcbInfoTcbStatus(tcbLevels []pcs.TcbLevel, tdQuoteBody *pb.TDQuoteBody
 }
 
 func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteBodyOptions) error {
-	logger.V(2).Infof("FMSPC from PCK Certificate is %q, and FMSPC value from PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
+	logger.V(2).Infof("FMSPC from PCK Certificate is %q, and FMSPC value from Intel PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	if tdQuoteBodyOptions.pckCertExtensions.FMSPC != tdQuoteBodyOptions.tcbInfo.Fmspc {
-		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
+		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from Intel PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	}
 
-	logger.V(2).Infof("PCEID from PCK Certificate is %q, and PCEID from PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
+	logger.V(2).Infof("PCEID from PCK Certificate is %q, and PCEID from Intel PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	if tdQuoteBodyOptions.pckCertExtensions.PCEID != tdQuoteBodyOptions.tcbInfo.PceID {
-		return fmt.Errorf("PCEID from PCK Certificate(%q) is not equal to PCEID from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
+		return fmt.Errorf("PCEID from PCK Certificate(%q) is not equal to PCEID from Intel PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	}
 
-	logger.V(2).Infof("MRSIGNERSEAM value from TD Quote Body is %q, and TdxModule.Mrsigner field in PCS's reported TDX TCB info is %q", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
+	logger.V(2).Infof("MRSIGNERSEAM value from TD Quote Body is %q, and TdxModule.Mrsigner field in Intel PCS's reported TDX TCB info is %q", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes, tdQuoteBody.GetMrSignerSeam()) {
-		return fmt.Errorf("MRSIGNERSEAM value from TD Quote Body(%q) is not equal to TdxModule.Mrsigner field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
+		return fmt.Errorf("MRSIGNERSEAM value from TD Quote Body(%q) is not equal to TdxModule.Mrsigner field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	}
 
 	if len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes) != len(tdQuoteBody.GetSeamAttributes()) {
-		return fmt.Errorf("size of SeamAttributes from TD Quote Body(%d) is not equal to size of TdxModule.AttributesMask in PCS's reported TDX TCB info(%d)", len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes), len(tdQuoteBody.GetSeamAttributes()))
+		return fmt.Errorf("size of SeamAttributes from TD Quote Body(%d) is not equal to size of TdxModule.AttributesMask in Intel PCS's reported TDX TCB info(%d)", len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes), len(tdQuoteBody.GetSeamAttributes()))
 	}
 	attributesMask := applyMask(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes, tdQuoteBody.GetSeamAttributes())
 
-	logger.V(2).Infof("AttributesMask value is %q, and TdxModule.Attributes field in PCS's reported TDX TCB info is %q", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
+	logger.V(2).Infof("AttributesMask value is %q, and TdxModule.Attributes field in Intel PCS's reported TDX TCB info is %q", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes, attributesMask) {
-		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
+		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	}
 
 	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo.TcbLevels, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
-		return fmt.Errorf("PCS's reported TDX TCB info failed TCB status check: %v", err)
+		return fmt.Errorf("Intel PCS's reported TDX TCB info failed TCB status check: %v", err)
 	}
 	return nil
 }
@@ -937,42 +937,42 @@ func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteB
 func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions) error {
 
 	if len(qeReportOptions.qeIdentity.MiscselectMask.Bytes) != 4 { // To create a uint32 variable, byte array should have size 4
-		return fmt.Errorf("MISCSELECTMask field size(%d) in PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.MiscselectMask.Bytes))
+		return fmt.Errorf("MISCSELECTMask field size(%d) in Intel PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.MiscselectMask.Bytes))
 	}
 	if len(qeReportOptions.qeIdentity.Miscselect.Bytes) != 4 { // To create a uint32 variable, byte array should have size 4
-		return fmt.Errorf("MISCSELECT field size(%d) in PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.Miscselect.Bytes))
+		return fmt.Errorf("MISCSELECT field size(%d) in Intel PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.Miscselect.Bytes))
 	}
 	miscSelectMask := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.MiscselectMask.Bytes)
 	miscSelect := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.Miscselect.Bytes)
 	miscSelectMask = qeReport.GetMiscSelect() & miscSelectMask
 
-	logger.V(2).Infof("MISCSELECT value from PCS's reported QE Identity is %v, and MISCSELECTMask value is %v", miscSelect, miscSelectMask)
+	logger.V(2).Infof("MISCSELECT value from Intel PCS's reported QE Identity is %v, and MISCSELECTMask value is %v", miscSelect, miscSelectMask)
 	if miscSelectMask != miscSelect {
-		return fmt.Errorf("MISCSELECT value(%v) from PCS's reported QE Identity is not equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
+		return fmt.Errorf("MISCSELECT value(%v) from Intel PCS's reported QE Identity is not equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
 	}
 
 	if len(qeReportOptions.qeIdentity.AttributesMask.Bytes) != len(qeReport.GetAttributes()) {
-		return fmt.Errorf("size of AttributesMask value(%d) in PCS's reported QE Identity is not equal to size of SeamAttributes value(%d) in QE Report", len(qeReportOptions.qeIdentity.AttributesMask.Bytes), len(qeReport.GetAttributes()))
+		return fmt.Errorf("size of AttributesMask value(%d) in Intel PCS's reported QE Identity is not equal to size of SeamAttributes value(%d) in QE Report", len(qeReportOptions.qeIdentity.AttributesMask.Bytes), len(qeReport.GetAttributes()))
 	}
 	qeAttributesMask := applyMask(qeReportOptions.qeIdentity.AttributesMask.Bytes, qeReport.GetAttributes())
 
-	logger.V(2).Infof("AttributesMask value is %v, and Attributes value in PCS's reported QE Identity is %v", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
+	logger.V(2).Infof("AttributesMask value is %v, and Attributes value in Intel PCS's reported QE Identity is %v", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Attributes.Bytes, qeAttributesMask) {
-		return fmt.Errorf("AttributesMask value(%v) is not equal to Attributes value(%v) in PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
+		return fmt.Errorf("AttributesMask value(%v) is not equal to Attributes value(%v) in Intel PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	}
 
-	logger.V(2).Infof("MRSIGNER value in QE Report is %q, and MRSIGNER value in PCS's reported QE Identity is %q", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
+	logger.V(2).Infof("MRSIGNER value in QE Report is %q, and MRSIGNER value in Intel PCS's reported QE Identity is %q", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Mrsigner.Bytes, qeReport.GetMrSigner()) {
-		return fmt.Errorf("MRSIGNER value(%q) in QE Report is not equal to MRSIGNER value(%q) in PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
+		return fmt.Errorf("MRSIGNER value(%q) in QE Report is not equal to MRSIGNER value(%q) in Intel PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	}
 
-	logger.V(2).Infof("ISV PRODID value in QE Report is %v, and ISV PRODID value in PCS's reported QE Identity is %v", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
+	logger.V(2).Infof("ISV PRODID value in QE Report is %v, and ISV PRODID value in Intel PCS's reported QE Identity is %v", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	if qeReport.GetIsvProdId() != uint32(qeReportOptions.qeIdentity.IsvProdID) {
-		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
+		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in Intel PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	}
 
 	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err != nil {
-		return fmt.Errorf("PCS's reported QE Identity failed TCB status check: %v", err)
+		return fmt.Errorf("Intel PCS's reported QE Identity failed TCB status check: %v", err)
 	}
 	return nil
 }
