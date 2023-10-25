@@ -501,28 +501,28 @@ func TestNegativeVerifyUsingTcbInfo(t *testing.T) {
 
 	sampleTcbInfo.TcbInfo = tcbInfo
 	sampleTcbInfo.TcbInfo.Fmspc = "11111f000000"
-	wantErr := `FMSPC from PCK Certificate("50806f000000") is not equal to FMSPC value from PCS's reported TDX TCB info("11111f000000")`
+	wantErr := `FMSPC from PCK Certificate("50806f000000") is not equal to FMSPC value from Intel PCS's reported TDX TCB info("11111f000000")`
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: sampleTcbInfo.TcbInfo, pckCertExtensions: ext}); err == nil || err.Error() != wantErr {
 		t.Errorf("FMSPC value changed: VerifyTdQuoteBody() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleTcbInfo.TcbInfo = tcbInfo
 	sampleTcbInfo.TcbInfo.PceID = "1111"
-	wantErr = `PCEID from PCK Certificate("0000") is not equal to PCEID from PCS's reported TDX TCB info("1111")`
+	wantErr = `PCEID from PCK Certificate("0000") is not equal to PCEID from Intel PCS's reported TDX TCB info("1111")`
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: sampleTcbInfo.TcbInfo, pckCertExtensions: ext}); err == nil || err.Error() != wantErr {
 		t.Errorf("PCEID value changed: verifyUsingTcbInfo() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleTcbInfo.TcbInfo = tcbInfo
 	sampleTcbInfo.TcbInfo.TdxModule.Mrsigner.Bytes = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	wantErr = `MRSIGNERSEAM value from TD Quote Body("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") is not equal to TdxModule.Mrsigner field in PCS's reported TDX TCB info("0102030405060708090a")`
+	wantErr = `MRSIGNERSEAM value from TD Quote Body("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") is not equal to TdxModule.Mrsigner field in Intel PCS's reported TDX TCB info("0102030405060708090a")`
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: sampleTcbInfo.TcbInfo, pckCertExtensions: ext}); err == nil || err.Error() != wantErr {
 		t.Errorf("Mrsigner value changed: verifyUsingTcbInfo() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleTcbInfo.TcbInfo = tcbInfo
 	sampleTcbInfo.TcbInfo.TdxModule.Attributes.Bytes = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	wantErr = `AttributesMask value("0000000000000000") is not equal to TdxModule.Attributes field in PCS's reported TDX TCB info("0102030405060708090a")`
+	wantErr = `AttributesMask value("0000000000000000") is not equal to TdxModule.Attributes field in Intel PCS's reported TDX TCB info("0102030405060708090a")`
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: sampleTcbInfo.TcbInfo, pckCertExtensions: ext}); err == nil || err.Error() != wantErr {
 		t.Errorf("Attributes value changed: verifyUsingTcbInfo() = %v. Want error %v", err, wantErr)
 	}
@@ -567,28 +567,28 @@ func TestNegativeVerifyUsingQeIdentity(t *testing.T) {
 
 	sampleQeIdentity.EnclaveIdentity = qeIdentity
 	sampleQeIdentity.EnclaveIdentity.Miscselect.Bytes = []byte{1, 2, 3, 4}
-	wantErr := "MISCSELECT value(67305985) from PCS's reported QE Identity is not equal to MISCSELECTMask value(0)"
+	wantErr := "MISCSELECT value(67305985) from Intel PCS's reported QE Identity is not equal to MISCSELECTMask value(0)"
 	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &sampleQeIdentity.EnclaveIdentity}); err == nil || err.Error() != wantErr {
 		t.Errorf("Miscselect value changed: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleQeIdentity.EnclaveIdentity = qeIdentity
 	sampleQeIdentity.EnclaveIdentity.Attributes.Bytes = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	wantErr = "AttributesMask value([17 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]) is not equal to Attributes value({[1 2 3 4 5 6 7 8 9 10]}) in PCS's reported QE Identity"
+	wantErr = "AttributesMask value([17 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]) is not equal to Attributes value({[1 2 3 4 5 6 7 8 9 10]}) in Intel PCS's reported QE Identity"
 	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &sampleQeIdentity.EnclaveIdentity}); err == nil || err.Error() != wantErr {
 		t.Errorf("Attributes value changed: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleQeIdentity.EnclaveIdentity = qeIdentity
 	sampleQeIdentity.EnclaveIdentity.Mrsigner.Bytes = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	wantErr = `MRSIGNER value("dc9e2a7c6f948f17474e34a7fc43ed030f7c1563f1babddf6340c82e0e54a8c5") in QE Report is not equal to MRSIGNER value({"\x01\x02\x03\x04\x05\x06\a\b\t\n"}) in PCS's reported QE Identity`
+	wantErr = `MRSIGNER value("dc9e2a7c6f948f17474e34a7fc43ed030f7c1563f1babddf6340c82e0e54a8c5") in QE Report is not equal to MRSIGNER value({"\x01\x02\x03\x04\x05\x06\a\b\t\n"}) in Intel PCS's reported QE Identity`
 	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &sampleQeIdentity.EnclaveIdentity}); err == nil || err.Error() != wantErr {
 		t.Errorf("Mrsigner value changed: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 
 	sampleQeIdentity.EnclaveIdentity = qeIdentity
 	sampleQeIdentity.EnclaveIdentity.IsvProdID = 5
-	wantErr = "ISV PRODID value(2) in QE Report is not equal to ISV PRODID value(5) in PCS's reported QE Identity"
+	wantErr = "ISV PRODID value(2) in QE Report is not equal to ISV PRODID value(5) in Intel PCS's reported QE Identity"
 	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &sampleQeIdentity.EnclaveIdentity}); err == nil || err.Error() != wantErr {
 		t.Errorf("IsvProdID value changed: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
@@ -707,7 +707,7 @@ func TestValidateCRL(t *testing.T) {
 func TestNegativeRawQuoteVerifyWithCollateral(t *testing.T) {
 	getter := testcases.TestGetter
 	options := &Options{CheckRevocations: true, GetCollateral: true, Getter: getter, Now: currentTime}
-	wantErr := "PCS's reported TDX TCB info failed TCB status check: no matching TCB level found"
+	wantErr := "TDX TCB info reported by Intel PCS failed TCB status check: no matching TCB level found"
 	// Due to updated SVN values in the sample response, it will result in TCB status failure,
 	// when compared to the TD Quote Body's TeeTcbSvn value.
 	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {

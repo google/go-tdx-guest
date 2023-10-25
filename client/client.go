@@ -85,9 +85,9 @@ func GetRawQuote(d Device, reportData [64]byte) ([]uint8, uint32, error) {
 			return nil, 0, fmt.Errorf("request feature is not supported")
 		} else if tdxHdr.OutLen == 0 || tdxHdr.OutLen > labi.ReqBufSize {
 			return nil, 0, fmt.Errorf("invalid Quote size: %v. It must be > 0 and <= : %v", tdxHdr.OutLen, labi.ReqBufSize)
-		} else {
-			return nil, 0, fmt.Errorf("unexpected error: %v", tdxHdr.Status)
 		}
+
+		return nil, 0, fmt.Errorf("unexpected error: %v", tdxHdr.Status)
 	}
 
 	return tdxHdr.Data[:tdxHdr.OutLen], tdxHdr.OutLen, nil

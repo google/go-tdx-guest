@@ -25,6 +25,7 @@ import (
 	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
+	"github.com/google/logger"
 	"go.uber.org/multierr"
 )
 
@@ -158,6 +159,7 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 
 func byteCheckRtmr(size int, given, required [][]byte) error {
 	if len(required) == 0 {
+		logger.V(1).Info("Skipping validation check for RTMRs field: input provided is nil")
 		return nil
 	}
 	if len(required) != rtmrsCount {
@@ -165,30 +167,40 @@ func byteCheckRtmr(size int, given, required [][]byte) error {
 	}
 	for i := range required {
 		if len(required[i]) == 0 {
+			logger.V(1).Infof("Skipping validation check for RTMR[%d] field: input provided is nil", i+1)
 			continue
 		}
 		if len(required[i]) != size {
 			return fmt.Errorf("RTMR[%d] should be 48 bytes, found %d", i, len(required[i]))
 		}
+
+		logger.V(2).Infof("Quote field RTMR[%d] value is %s, and expected value is %s", i+1, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		if !bytes.Equal(required[i], given[i]) {
 			return fmt.Errorf("quote field RTMR[%d] is %s. Expect %s",
 				i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
 		}
+
+		logger.V(1).Infof("Successfully validated RTMR[%d] field", i+1)
 	}
 	return nil
 }
 
 func byteCheck(option, field string, size int, given, required []byte) error {
 	if len(required) == 0 {
+		logger.V(1).Infof("Skipping validation check for %s field: input provided is nil", field)
 		return nil
 	}
 	if len(required) != size {
 		return fmt.Errorf("option %v must be nil or %d bytes", option, size)
 	}
+
+	logger.V(2).Infof("Quote field %s value is %s, and expected value is %s", field, hex.EncodeToString(given), hex.EncodeToString(required))
 	if !bytes.Equal(required, given) {
 		return fmt.Errorf("quote field %s is %s. Expect %s",
 			field, hex.EncodeToString(given), hex.EncodeToString(required))
 	}
+
+	logger.V(1).Infof("Successfully validated %s field", field)
 	return nil
 }
 
@@ -221,20 +233,33 @@ func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
 }
 
 func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
+	logger.V(1).Info("Setting the minimum_qe_svn parameter value to ", opts.HeaderOptions.MinimumQeSvn)
+	logger.V(1).Info("Setting the minimum_pce_svn parameter value to ", opts.HeaderOptions.MinimumPceSvn)
+	logger.V(1).Info("Setting the minimum_tee_tcb_svn parameter value to ", opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
+
+	logger.V(2).Infof("TEE TCB security-version number is %v, and minimum_tee_tcb_svn value is %v", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	if !isSvnHigherOrEqual(quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
 			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
+
+	logger.V(1).Info("Successfully validated TEE TCB security-version number")
 	qeSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn())
 	pceSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn())
+	logger.V(2).Infof("QE security-version number is %d, and minimum_qe_svn value is %d", qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	if qeSvn < opts.HeaderOptions.MinimumQeSvn {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
 			qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	}
+	logger.V(1).Info("Successfully validated QE security-version number")
+
+	logger.V(2).Infof("PCE security-version number is %d, and minimum_pce_svn value is %d", pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	if pceSvn < opts.HeaderOptions.MinimumPceSvn {
 		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
 			pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	}
+
+	logger.V(1).Info("Successfully validated PCE security-version number")
 	return nil
 }
 
@@ -246,12 +271,14 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 		return fmt.Errorf("xfam size is invalid")
 	}
 	xfam := binary.LittleEndian.Uint64(value[:])
+	logger.V(2).Infof("XFAM value is %v, XFAMFixed0 value is %v and XFAMFixed1 value is %v", xfam, fixed0, fixed1)
 	if xfam&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized xfam 0x%x as xfamFixed1 0x%x bits are unset", xfam, fixed1)
 	}
 	if xfam&(^fixed0) != 0 {
 		return fmt.Errorf("unauthorized xfam 0x%x as xfamFixed0 0x%x bits are set", xfam, fixed0)
 	}
+	logger.V(1).Info("Successfully validated XFAM field")
 	return nil
 }
 
@@ -263,12 +290,14 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 		return fmt.Errorf("tdAttributes size is invalid")
 	}
 	tdAttributes := binary.LittleEndian.Uint64(value[:])
+	logger.V(2).Infof("TdAttributes value is %v, TdAttributesFixed0 value is %v and TdAttributesFixed1 value is %v", tdAttributes, fixed0, fixed1)
 	if tdAttributes&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed1 0x%x bits are unset", tdAttributes, fixed1)
 	}
 	if tdAttributes&(^fixed0) != 0 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed0 0x%x bits are set", tdAttributes, fixed0)
 	}
+	logger.V(1).Info("Successfully validated TdAttributes field")
 	return nil
 }
 
@@ -281,6 +310,7 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	if err := abi.CheckQuoteV4(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
+	logger.V(1).Info("Validating the TDX Quote using input parameters")
 	return multierr.Combine(
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),

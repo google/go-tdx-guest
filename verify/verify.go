@@ -271,6 +271,7 @@ func bytesToEcdsaPubKey(b []byte) (*ecdsa.PublicKey, error) {
 		Y:     new(big.Int).SetBytes(b[pubKeySize/2 : pubKeySize]),
 	}
 
+	logger.V(2).Info("Public Key is on curve ", publicKey.Curve.Params().Name)
 	if !publicKey.Curve.IsOnCurve(publicKey.X, publicKey.Y) {
 		return nil, fmt.Errorf("public key is not on curve %q", publicKey.Curve.Params().Name)
 	}
@@ -345,8 +346,9 @@ func bodyToRawMessage(name string, body []byte) ([]byte, error) {
 }
 
 func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) error {
-	pcsCrlURL := pcs.PckCrlURL(ca)
-	header, body, err := getter.Get(pcsCrlURL)
+	pckCrlURL := pcs.PckCrlURL(ca)
+	logger.V(2).Info("Getting PCK CRL: ", pckCrlURL)
+	header, body, err := getter.Get(pckCrlURL)
 	if err != nil {
 		return CRLUnavailableErr{multierr.Append(err, errors.New("could not fetch PCK CRL"))}
 	}
@@ -367,6 +369,7 @@ func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) erro
 
 func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) error {
 	tcbInfoURL := pcs.TcbInfoURL(fmspc)
+	logger.V(2).Info("Getting TCB Info: ", tcbInfoURL)
 	header, body, err := getter.Get(tcbInfoURL)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
@@ -402,6 +405,7 @@ func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) 
 
 func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
 	qeIdentityURL := pcs.QeIdentityURL()
+	logger.V(2).Info("Getting QE Identity: ", qeIdentityURL)
 	header, body, err := getter.Get(qeIdentityURL)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
@@ -435,10 +439,11 @@ func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
 }
 
 func getRootCrl(getter trust.HTTPSGetter, collateral *Collateral) error {
-	rootCrlURL := collateral.QeIdentityIssuerRootCertificate.CRLDistributionPoints // QE identity issuer chain's root certificate contains url for Root CA CRL
+	rootCrlURL := collateral.QeIdentityIssuerRootCertificate.CRLDistributionPoints // QE identity issuer chain's root certificate contains URL for Root CA CRL
 	if len(rootCrlURL) == 0 {
 		return ErrEmptyRootCRLUrl
 	}
+	logger.V(2).Info("Getting Root CA CRL: ", rootCrlURL)
 	var errs error
 	for i := range rootCrlURL {
 		_, body, err := getter.Get(rootCrlURL[i])
@@ -464,20 +469,29 @@ func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, e
 		getter = trust.DefaultHTTPSGetter()
 	}
 	collateral := &Collateral{}
-
+	logger.V(1).Info("Getting TCB Info API response from the Intel PCS")
 	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive tcbInfo: %v", err)
 	}
+	logger.V(1).Info("Successfully received TCB Info API response from the Intel PCS")
+
+	logger.V(1).Info("Getting QE Identity API response from the Intel PCS")
 	if err := getQeIdentity(getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive QeIdentity: %v", err)
 	}
+	logger.V(1).Info("Successfully received QE Identity API response from the Intel PCS")
+
 	if options.CheckRevocations {
+		logger.V(1).Info("Getting PCK CRL from the Intel PCS")
 		if err := getPckCrl(ca, getter, collateral); err != nil {
 			return nil, fmt.Errorf("unable to receive PCK CRL: %v", err)
 		}
+		logger.V(1).Info("Successfully received PCK CRL from the Intel PCS")
+		logger.V(1).Info("Getting Root CA CRL from the Intel PCS")
 		if err := getRootCrl(getter, collateral); err != nil {
 			return nil, fmt.Errorf("unable to receive Root CA CRL: %v", err)
 		}
+		logger.V(1).Info("Successfully received Root CA CRL from the Intel PCS")
 	}
 	return collateral, nil
 }
@@ -485,6 +499,7 @@ func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, e
 func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 	currentTime := options.Now
 
+	logger.V(1).Info("Checking expiration status of collaterals")
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
 
@@ -520,12 +535,13 @@ func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 			return ErrPCKCrlRootCertExpired
 		}
 	}
+	logger.V(1).Info("Collaterals not expired")
 	return nil
 }
 
 func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) error {
 	currentTime := options.Now
-
+	logger.V(1).Info("Checking expiration status of certificates")
 	if currentTime.After(chain.RootCertificate.NotAfter) {
 		return ErrRootCaCertExpired
 	}
@@ -535,6 +551,7 @@ func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) er
 	if currentTime.After(chain.PCKCertificate.NotAfter) {
 		return ErrPckLeafCertExpired
 	}
+	logger.V(1).Info("Certificates are up-to-date")
 	return nil
 }
 
@@ -600,6 +617,7 @@ func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not interpret PCK leaf certificate DER bytes: %v", err)
 	}
+	logger.V(1).Info("PCK Leaf certificate has been extracted from the certificate chain")
 
 	intermediate, rem := pem.Decode(rem)
 	if intermediate == nil || len(rem) == 0 || intermediate.Type != certificateType {
@@ -609,6 +627,7 @@ func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not interpret Intermediate CA certificate DER bytes: %v", err)
 	}
+	logger.V(1).Info("Intermediate certificate has been extracted from the certificate chain")
 
 	root, rem := pem.Decode(rem)
 	if root == nil || len(rem) != 0 || root.Type != certificateType {
@@ -619,20 +638,26 @@ func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not interpret Root CA certificate DER bytes: %v", err)
 	}
+	logger.V(1).Info("Root CA certificate has been extracted from the certificate chain")
+
 	return &PCKCertificateChain{PCKCertificate: pckCert,
 		RootCertificate:         rootCert,
 		IntermediateCertificate: intermediateCert}, nil
 }
 
 func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x509.SignatureAlgorithm, publicKeyAlgorithm x509.PublicKeyAlgorithm, curve string) error {
+
+	logger.V(2).Info("Certificate version: ", cert.Version)
 	if cert.Version != version {
 		return fmt.Errorf("certificate's version found %v. Expected %d", cert.Version, version)
 	}
 
+	logger.V(2).Info("Certificate's signature algorithm: ", cert.SignatureAlgorithm)
 	if cert.SignatureAlgorithm != signatureAlgorithm {
 		return fmt.Errorf("certificate's signature algorithm found %v. Expected %v", cert.SignatureAlgorithm, signatureAlgorithm)
 	}
 
+	logger.V(2).Info("Certificate's public key algorithm: ", cert.PublicKeyAlgorithm)
 	if cert.PublicKeyAlgorithm != publicKeyAlgorithm {
 		return fmt.Errorf("certificate's public Key algorithm found %v. Expected %v", cert.PublicKeyAlgorithm, publicKeyAlgorithm)
 	}
@@ -640,6 +665,7 @@ func validateX509Cert(cert *x509.Certificate, version int, signatureAlgorithm x5
 	// Locally bind the public key any type to allow for occurrence typing in the switch statement.
 	switch pub := cert.PublicKey.(type) {
 	case *ecdsa.PublicKey:
+		logger.V(2).Info("Certificate's public key curve: ", pub.Curve.Params().Name)
 		if pub.Curve.Params().Name != curve {
 			return fmt.Errorf("certificate's public key curve is %q. Expected %q", pub.Curve.Params().Name, curve)
 		}
@@ -664,10 +690,12 @@ func validateCertificate(cert *x509.Certificate, parent *x509.Certificate, phras
 		return err
 	}
 
+	logger.V(2).Info("Certificate's subject name found: ", cert.Subject.CommonName)
 	if cert.Subject.CommonName != phrase {
 		return fmt.Errorf("%q is not expected in certificate's subject name. Expected %q", cert.Subject.CommonName, phrase)
 	}
 
+	logger.V(2).Info("Certificate's issuer name found: ", cert.Issuer.String())
 	if cert.Issuer.String() != parent.Subject.String() {
 		return fmt.Errorf("certificate's issuer name (%q), does not match with parent certificate's subject name (%q)", cert.Issuer.String(), parent.Subject.String())
 	}
@@ -675,6 +703,7 @@ func validateCertificate(cert *x509.Certificate, parent *x509.Certificate, phras
 	if err := cert.CheckSignatureFrom(parent); err != nil {
 		return fmt.Errorf("certificate signature verification using parent certificate failed: %v", err)
 	}
+	logger.V(1).Info("Certificate's signature verified using parent certificate")
 	return nil
 }
 
@@ -686,12 +715,15 @@ func validateCRL(crl *x509.RevocationList, trustedCertificate *x509.Certificate)
 		return ErrTrustedCertEmpty
 	}
 
+	logger.V(2).Info("CRL issuer's name found: ", crl.Issuer.String())
 	if crl.Issuer.String() != trustedCertificate.Subject.String() {
 		return fmt.Errorf("CRL issuer's name %q does not match with expected name %q", crl.Issuer.String(), trustedCertificate.Subject.String())
 	}
+
 	if err := crl.CheckSignatureFrom(trustedCertificate); err != nil {
 		return fmt.Errorf("CRL signature verification failed using trusted certificate: %v", err)
 	}
+	logger.V(1).Info("CRL signature verified using trusted certificate")
 
 	return nil
 }
@@ -726,29 +758,44 @@ func verifyPCKCertificationChain(options *Options) error {
 		return ErrPCKCertNil
 	}
 
+	logger.V(1).Info("Verifying the Root CA Certificate")
 	// root certificate should be a self-signed certificate
 	if err := validateCertificate(rootCert, rootCert, rootCertPhrase); err != nil {
 		return fmt.Errorf("unable to validate root cert: %v", err)
 	}
+	logger.V(1).Info("Root CA Certificate verified successfully")
+
+	logger.V(1).Info("Verifying Intermediate CA certificate")
 	if err := validateCertificate(intermediateCert, rootCert, intermediateCertPhrase); err != nil {
 		return fmt.Errorf("unable to validate Intermediate CA certificate: %v", err)
 	}
+	logger.V(1).Info("Intermediate CA Certificate verified successfully")
+
+	logger.V(1).Info("Verifying PCK Leaf certificate")
 	if err := validateCertificate(pckCert, intermediateCert, pckCertPhrase); err != nil {
 		return fmt.Errorf("unable to validate PCK leaf certificate: %v", err)
 	}
+	logger.V(1).Info("PCK Leaf Certificate verified successfully")
 
 	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options.Now)); err != nil {
 		return fmt.Errorf("error verifying PCK Certificate: %v (%v)", err, rootCert.IsCA)
 	}
+	logger.V(1).Info("PCK Certificate Chain verified successfully")
 
 	if options.CheckRevocations {
 		if options.GetCollateral {
+			logger.V(1).Info("Verifying Root CA CRL")
 			if err := validateCRL(collateral.RootCaCrl, rootCert); err != nil {
 				return fmt.Errorf("root CA CRL verification failed using root certificate in PCK Certificate chain: %v", err)
 			}
+			logger.V(1).Info("Root CA CRL verified successfully")
+
+			logger.V(1).Info("Verifying PCK CRL")
 			if err := validateCRL(collateral.PckCrl, intermediateCert); err != nil {
 				return fmt.Errorf("PCK CRL verification failed using intermediate certificate in PCK Certificate chain: %v", err)
 			}
+			logger.V(1).Info("PCK CRL verified successfully")
+
 			if collateral.PckCrl.Issuer.String() != pckCert.Issuer.String() {
 				return fmt.Errorf("issuer's name(%q) in PCK CRL does not match with PCK Leaf Certificate's issuer name(%q)", collateral.PckCrl.Issuer.String(), pckCert.Issuer.String())
 			}
@@ -757,11 +804,14 @@ func verifyPCKCertificationChain(options *Options) error {
 					return fmt.Errorf("intermediate certificate in PCK certificate chain was revoked at %v", bad.RevocationTime)
 				}
 			}
+			logger.V(1).Info("Intermediate Certificate is not revoked by Root CA CRL")
+
 			for _, bad := range collateral.PckCrl.RevokedCertificates {
 				if pckCert.SerialNumber.Cmp(bad.SerialNumber) == 0 {
 					return fmt.Errorf("PCK Leaf certificate in PCK certificate chain was revoked at %v", bad.RevocationTime)
 				}
 			}
+			logger.V(1).Info("PCK Leaf Certificate is not revoked by PCK CRL")
 		} else {
 			return ErrRevocationCheckFailed
 		}
@@ -839,11 +889,13 @@ func checkTcbInfoTcbStatus(tcbLevels []pcs.TcbLevel, tdQuoteBody *pb.TDQuoteBody
 	if err != nil {
 		return err
 	}
+	logger.V(2).Info("Matching TCB Level found: ", matchingTcbLevel)
 
 	if matchingTcbLevel.Tcb.TdxTcbcomponents[1].Svn != tdQuoteBody.GetTeeTcbSvn()[1] {
 		return fmt.Errorf("SVN at index 1(%v) in Tcb.TdxTcbcomponents is not equal to TD Quote Body's index 1(%v) TEE TCB svn value", matchingTcbLevel.Tcb.TdxTcbcomponents[1].Svn, tdQuoteBody.GetTeeTcbSvn()[1])
 	}
 
+	logger.V(2).Info("TCB Status found: ", matchingTcbLevel.TcbStatus)
 	if matchingTcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
 		return fmt.Errorf("TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTcbLevel.TcbStatus)
 	}
@@ -851,29 +903,33 @@ func checkTcbInfoTcbStatus(tcbLevels []pcs.TcbLevel, tdQuoteBody *pb.TDQuoteBody
 }
 
 func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteBodyOptions) error {
+	logger.V(2).Infof("FMSPC from PCK Certificate is %q, and FMSPC value from Intel PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	if tdQuoteBodyOptions.pckCertExtensions.FMSPC != tdQuoteBodyOptions.tcbInfo.Fmspc {
-		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
+		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from Intel PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	}
 
+	logger.V(2).Infof("PCEID from PCK Certificate is %q, and PCEID from Intel PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	if tdQuoteBodyOptions.pckCertExtensions.PCEID != tdQuoteBodyOptions.tcbInfo.PceID {
-		return fmt.Errorf("PCEID from PCK Certificate(%q) is not equal to PCEID from PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
+		return fmt.Errorf("PCEID from PCK Certificate(%q) is not equal to PCEID from Intel PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.PCEID, tdQuoteBodyOptions.tcbInfo.PceID)
 	}
 
+	logger.V(2).Infof("MRSIGNERSEAM value from TD Quote Body is %q, and TdxModule.Mrsigner field in Intel PCS's reported TDX TCB info is %q", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes, tdQuoteBody.GetMrSignerSeam()) {
-		return fmt.Errorf("MRSIGNERSEAM value from TD Quote Body(%q) is not equal to TdxModule.Mrsigner field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
+		return fmt.Errorf("MRSIGNERSEAM value from TD Quote Body(%q) is not equal to TdxModule.Mrsigner field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(tdQuoteBody.GetMrSignerSeam()), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Mrsigner.Bytes))
 	}
 
 	if len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes) != len(tdQuoteBody.GetSeamAttributes()) {
-		return fmt.Errorf("size of SeamAttributes from TD Quote Body(%d) is not equal to size of TdxModule.AttributesMask in PCS's reported TDX TCB info(%d)", len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes), len(tdQuoteBody.GetSeamAttributes()))
+		return fmt.Errorf("size of SeamAttributes from TD Quote Body(%d) is not equal to size of TdxModule.AttributesMask in Intel PCS's reported TDX TCB info(%d)", len(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes), len(tdQuoteBody.GetSeamAttributes()))
 	}
 	attributesMask := applyMask(tdQuoteBodyOptions.tcbInfo.TdxModule.AttributesMask.Bytes, tdQuoteBody.GetSeamAttributes())
 
+	logger.V(2).Infof("AttributesMask value is %q, and TdxModule.Attributes field in Intel PCS's reported TDX TCB info is %q", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	if !bytes.Equal(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes, attributesMask) {
-		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
+		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	}
 
 	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo.TcbLevels, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
-		return fmt.Errorf("PCS's reported TDX TCB info failed TCB status check: %v", err)
+		return fmt.Errorf("TDX TCB info reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
 }
@@ -881,37 +937,42 @@ func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteB
 func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions) error {
 
 	if len(qeReportOptions.qeIdentity.MiscselectMask.Bytes) != 4 { // To create a uint32 variable, byte array should have size 4
-		return fmt.Errorf("MISCSELECTMask field size(%d) in PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.MiscselectMask.Bytes))
+		return fmt.Errorf("MISCSELECTMask field size(%d) in Intel PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.MiscselectMask.Bytes))
 	}
 	if len(qeReportOptions.qeIdentity.Miscselect.Bytes) != 4 { // To create a uint32 variable, byte array should have size 4
-		return fmt.Errorf("MISCSELECT field size(%d) in PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.Miscselect.Bytes))
+		return fmt.Errorf("MISCSELECT field size(%d) in Intel PCS's reported QE Identity is not equal to expected size(4)", len(qeReportOptions.qeIdentity.Miscselect.Bytes))
 	}
 	miscSelectMask := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.MiscselectMask.Bytes)
 	miscSelect := binary.LittleEndian.Uint32(qeReportOptions.qeIdentity.Miscselect.Bytes)
 	miscSelectMask = qeReport.GetMiscSelect() & miscSelectMask
+
+	logger.V(2).Infof("MISCSELECT value from Intel PCS's reported QE Identity is %v, and MISCSELECTMask value is %v", miscSelect, miscSelectMask)
 	if miscSelectMask != miscSelect {
-		return fmt.Errorf("MISCSELECT value(%v) from PCS's reported QE Identity is not equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
+		return fmt.Errorf("MISCSELECT value(%v) from Intel PCS's reported QE Identity is not equal to MISCSELECTMask value(%v)", miscSelect, miscSelectMask)
 	}
 
 	if len(qeReportOptions.qeIdentity.AttributesMask.Bytes) != len(qeReport.GetAttributes()) {
-		return fmt.Errorf("size of AttributesMask value(%d) in PCS's reported QE Identity is not equal to size of SeamAttributes value(%d) in QE Report", len(qeReportOptions.qeIdentity.AttributesMask.Bytes), len(qeReport.GetAttributes()))
+		return fmt.Errorf("size of AttributesMask value(%d) in Intel PCS's reported QE Identity is not equal to size of SeamAttributes value(%d) in QE Report", len(qeReportOptions.qeIdentity.AttributesMask.Bytes), len(qeReport.GetAttributes()))
 	}
 	qeAttributesMask := applyMask(qeReportOptions.qeIdentity.AttributesMask.Bytes, qeReport.GetAttributes())
 
+	logger.V(2).Infof("AttributesMask value is %v, and Attributes value in Intel PCS's reported QE Identity is %v", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Attributes.Bytes, qeAttributesMask) {
-		return fmt.Errorf("AttributesMask value(%v) is not equal to Attributes value(%v) in PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
+		return fmt.Errorf("AttributesMask value(%v) is not equal to Attributes value(%v) in Intel PCS's reported QE Identity", qeAttributesMask, qeReportOptions.qeIdentity.Attributes)
 	}
 
+	logger.V(2).Infof("MRSIGNER value in QE Report is %q, and MRSIGNER value in Intel PCS's reported QE Identity is %q", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	if !bytes.Equal(qeReportOptions.qeIdentity.Mrsigner.Bytes, qeReport.GetMrSigner()) {
-		return fmt.Errorf("MRSIGNER value(%q) in QE Report is not equal to MRSIGNER value(%q) in PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
+		return fmt.Errorf("MRSIGNER value(%q) in QE Report is not equal to MRSIGNER value(%q) in Intel PCS's reported QE Identity", hex.EncodeToString(qeReport.GetMrSigner()), qeReportOptions.qeIdentity.Mrsigner)
 	}
 
+	logger.V(2).Infof("ISV PRODID value in QE Report is %v, and ISV PRODID value in Intel PCS's reported QE Identity is %v", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	if qeReport.GetIsvProdId() != uint32(qeReportOptions.qeIdentity.IsvProdID) {
-		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
+		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in Intel PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	}
 
 	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err != nil {
-		return fmt.Errorf("PCS's reported QE Identity failed TCB status check: %v", err)
+		return fmt.Errorf("QE Identity reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
 }
@@ -921,17 +982,23 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 	collateral := options.collateral
 	pckCertExtensions := options.pckCertExtensions
 	attestkey := quote.GetSignedData().GetEcdsaAttestationKey()
+
+	logger.V(1).Info("Extracting attestation key from the quote")
 	attestPublicKey, err := bytesToEcdsaPubKey(attestkey)
 	if err != nil {
-		return fmt.Errorf("attestation key in quote is invalid: %v", err)
+		return fmt.Errorf("attestation key in the quote is invalid: %v", err)
 	}
+	logger.V(1).Info("Attestation key extracted successfully from the quote")
 
+	logger.V(1).Info("Extracting signature present in the quote")
 	signature := quote.GetSignedData().GetSignature()
 	signature, err = abi.SignatureToDER(signature)
 	if err != nil {
 		return fmt.Errorf("unable to convert QuoteV4's signature to DER format: %v", err)
 	}
+	logger.V(1).Info("Signature extracted successfully from the quote")
 
+	logger.V(1).Info("Verifying Header and TD Quote Body using attestation key and signature present in the quote")
 	message, err := getHeaderAndTdQuoteBodyInAbiBytes(quote)
 	if err != nil {
 		return fmt.Errorf("could not get message digest for verification: %v", err)
@@ -944,18 +1011,24 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 	if !ecdsa.VerifyASN1(attestPublicKey, hashedMessage[:], signature) {
 		return ErrHashVerificationFail
 	}
+	logger.V(1).Info("Header and TD Quote Body verified successfully")
 
 	qeReportCertificationData := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData()
 
+	logger.V(1).Info("Verifying the QE Report signature using PCK Leaf certificate")
 	if err := tdxProtoQeReportSignature(qeReportCertificationData, chain.PCKCertificate); err != nil {
 		return fmt.Errorf("error verifying QE report signature: %v", err)
 	}
+	logger.V(1).Info("QE Report signature verified successfully")
 
+	logger.V(1).Info("Verifying QE Report Data")
 	if err := verifyHash256(quote); err != nil {
 		return fmt.Errorf("error verifying QE report data: %v", err)
 	}
+	logger.V(1).Info("QE Report Data verified successfully")
 
 	if collateral != nil {
+		logger.V(1).Info("Verifying TD Quote Body using TCB Info API response")
 		if err := verifyTdQuoteBody(quote.GetTdQuoteBody(),
 			&tdQuoteBodyOptions{
 				tcbInfo:           collateral.TdxTcbInfo.TcbInfo,
@@ -963,13 +1036,15 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 			}); err != nil {
 			return err
 		}
-
+		logger.V(1).Info("TD Quote Body verified successfully")
+		logger.V(1).Info("Verifying QE Report using QE Identity API response")
 		if err := verifyQeReport(qeReportCertificationData.GetQeReport(),
 			&qeReportOptions{
 				qeIdentity: &collateral.QeIdentity.EnclaveIdentity,
 			}); err != nil {
 			return err
 		}
+		logger.V(1).Info("QE Report verified successfully")
 	}
 
 	return nil
@@ -992,21 +1067,28 @@ func tdxQeReportSignature(qeReport []byte, signature []byte, pckCert *x509.Certi
 	if err := pckCert.CheckSignature(x509.ECDSAWithSHA256, qeReport, derSignature); err != nil {
 		return fmt.Errorf("QE report's signature verification using PCK Leaf Certificate failed: %v", err)
 	}
+	logger.V(1).Info("QE Report's signature verified using PCK Leaf Certificate")
 
 	return nil
 }
 
 func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, signingCertificate *x509.Certificate, rawBody []byte, rawSignature string, crl *x509.RevocationList, options *Options) error {
 
+	logger.V(1).Info("Verifying root certificate in the issuer chain")
 	if err := validateCertificate(rootCertificate, rootCertificate, rootCertPhrase); err != nil {
 		return fmt.Errorf("unable to validate root certificate in the issuer chain: %v", err)
 	}
+	logger.V(1).Info("Root certificate verified successfully in the issuer chain")
+
+	logger.V(1).Info("Verifiying signing certificate in the issuer chain")
 	if err := validateCertificate(signingCertificate, rootCertificate, signingPhrase); err != nil {
 		return fmt.Errorf("unable to validate signing certificate in the issuer chain: %v", err)
 	}
+	logger.V(1).Info("Signing certificate verified successfully in the issuer chain")
 	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, options.Now)); err != nil {
 		return fmt.Errorf("unable to verify signing certificate: %v", err)
 	}
+	logger.V(1).Info("Signing certificate successfully verified using trusted roots")
 
 	signature, err := hex.DecodeString(rawSignature)
 	if err != nil {
@@ -1018,21 +1100,26 @@ func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, sig
 		return fmt.Errorf("unable to convert signature to DER format: %v", err)
 	}
 
+	logger.V(1).Info("Verifying response body using signing certificate")
 	if err := signingCertificate.CheckSignature(x509.ECDSAWithSHA256, rawBody, derSignature); err != nil {
 		return fmt.Errorf("could not verify response body using the signing certificate: %v", err)
 	}
+	logger.V(1).Info("Response body verified successfully using signing certificate")
 
 	if options.CheckRevocations {
 		if options.GetCollateral {
+			logger.V(1).Info("Verifying Root CA CRL using root certificate in the issuer's chain")
 			if err := validateCRL(crl, rootCertificate); err != nil {
 				return fmt.Errorf("root CA CRL verification failed using root certificate in the issuer's chain: %v", err)
 			}
+			logger.V(1).Info("Root CA CRL verified successfully using root certificate in the issuer's chain")
 
 			for _, bad := range crl.RevokedCertificates {
 				if signingCertificate.SerialNumber.Cmp(bad.SerialNumber) == 0 {
 					return fmt.Errorf("signing certificate was revoked at %v", bad.RevocationTime)
 				}
 			}
+			logger.V(1).Info("Root certificate is not revoked by the signing certificate")
 		} else {
 			return ErrRevocationCheckFailed
 		}
@@ -1045,16 +1132,21 @@ func verifyTCBinfo(options *Options) error {
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	signature := collateral.TdxTcbInfo.Signature
 
+	logger.V(2).Infof("TcbInfo ID is %q, and expected ID is %q", tcbInfo.ID, tcbInfoID)
 	if tcbInfo.ID != tcbInfoID {
 		return fmt.Errorf("tcbInfo ID %q does not match with expected ID %q", tcbInfo.ID, tcbInfoID)
 	}
+
+	logger.V(2).Infof("TcbInfo version is %v, and expected version is %v", tcbInfo.Version, tcbInfoVersion)
 	if tcbInfo.Version != tcbInfoVersion {
 		return fmt.Errorf("tcbInfo version %v does not match with expected version %v", tcbInfo.Version, tcbInfoVersion)
 	}
+
 	if len(tcbInfo.TcbLevels) == 0 {
 		return ErrTcbInfoTcbLevelsMissing
 	}
 
+	logger.V(1).Info("Verifying TCB Info response")
 	if err := verifyResponse(tcbSigningPhrase, collateral.TcbInfoIssuerRootCertificate, collateral.TcbInfoIssuerIntermediateCertificate,
 		collateral.TcbInfoBody, signature, collateral.RootCaCrl, options); err != nil {
 		return fmt.Errorf("tcbInfo response verification failed: %v", err)
@@ -1068,15 +1160,20 @@ func verifyQeIdentity(options *Options) error {
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
 	signature := collateral.QeIdentity.Signature
 
+	logger.V(2).Infof("QeIdentity ID is %q, and expected ID is %q", qeIdentity.ID, qeIdentityID)
 	if qeIdentity.ID != qeIdentityID {
 		return fmt.Errorf("QeIdentity ID %q does not match with expected ID %q", qeIdentity.ID, qeIdentityID)
 	}
+
+	logger.V(2).Infof("QeIdentity version is %v, and expected version is %v", qeIdentity.Version, qeIdentityVersion)
 	if qeIdentity.Version != qeIdentityVersion {
 		return fmt.Errorf("QeIdentity version %v does not match with expected version %v", qeIdentity.Version, qeIdentityVersion)
 	}
+
 	if len(qeIdentity.TcbLevels) == 0 {
 		return ErrQeIdentityTcbLevelsMissing
 	}
+	logger.V(1).Info("Verifying QE Identity response")
 	if err := verifyResponse(tcbSigningPhrase, collateral.QeIdentityIssuerRootCertificate, collateral.QeIdentityIssuerIntermediateCertificate,
 		collateral.EnclaveIdentityBody, signature, collateral.RootCaCrl, options); err != nil {
 		return fmt.Errorf("QeIdentity response verification failed: %v", err)
@@ -1090,21 +1187,30 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 		return abi.ErrTeeType
 	}
 
+	logger.V(1).Info("Verifying the PCK Certificate Chain in the quote")
 	if err := verifyPCKCertificationChain(options); err != nil {
 		return err
 	}
+	logger.V(1).Info("PCK Certificate Chain successfully verified")
 
 	if options.GetCollateral {
-
+		logger.V(1).Info("Verifying the collaterals obtained from the Intel PCS")
 		if err := verifyCollateral(options); err != nil {
 			return fmt.Errorf("could not verify collaterals obtained: %v", err)
 		}
+
+		logger.V(1).Info("Verifying the TCB Info API response")
 		if err := verifyTCBinfo(options); err != nil {
 			return err
 		}
+		logger.V(1).Info("TCB Info API response verified successfully")
+
+		logger.V(1).Info("Verifying the QE Identity API response")
 		if err := verifyQeIdentity(options); err != nil {
 			return err
 		}
+		logger.V(1).Info("QE Identity API response verified successfully")
+		logger.V(1).Info("Collaterals verified successfully")
 	}
 
 	return verifyQuote(quote, options)
@@ -1117,10 +1223,16 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 		return ErrOptionsNil
 	}
 
+	logger.V(1).Info("Checking that the quote parameters meet the required size")
+	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
+	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
+
 	if err := abi.CheckQuoteV4(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
+	logger.V(1).Info("Quote parameters meet the required size")
 
+	logger.V(1).Info("Extracting PCK certificate chain from the quote")
 	chain, err := extractChainFromQuote(quote)
 	if err != nil {
 		return err
@@ -1129,9 +1241,15 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	if err != nil {
 		return fmt.Errorf("could not get PCK certificate extensions: %v", err)
 	}
+	logger.V(2).Info("PCK Leaf Certificate Issuer organization: ", chain.PCKCertificate.Issuer.Organization)
+	logger.V(2).Info("PCK Leaf Certificate FMSPC value: ", exts.FMSPC)
+
+	logger.V(1).Info("PCK Certificate Chain extracted successfully")
+
 	var collateral *Collateral
 	if options.GetCollateral {
 
+		logger.V(1).Info("Obtaining collaterals using APIs from the Intel PCS")
 		ca, err := extractCaFromPckCert(chain.PCKCertificate)
 		if err != nil {
 			return err
@@ -1140,6 +1258,7 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 		if err != nil {
 			return err
 		}
+		logger.V(1).Info("Collaterals successfully obtained using the APIs from the Intel PCS")
 	}
 	options.collateral = collateral
 	options.pckCertExtensions = exts
