@@ -50,7 +50,7 @@ func checkErr(err error) (bool, error) {
 	return false, nil
 }
 
-func runIteration(t testing.TB, c configfsi.Client, r *report.OpenReport, tc *runner) error {
+func runIteration(t testing.TB, _ configfsi.Client, r *report.OpenReport, tc *runner) error {
 	t.Helper()
 	nonce := makeNonce(tc.id)
 	t.Logf("Writing inblob %v", nonce)
