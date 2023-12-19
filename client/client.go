@@ -35,6 +35,11 @@ type Device interface {
 	Ioctl(command uintptr, argument any) (uintptr, error)
 }
 
+// QuoteProvider encapsulates calls to attestation quote.
+type QuoteProvider interface {
+	IsSupported() error
+	GetRawQuote(reportData [64]byte) ([]uint8, error)
+}
 // UseDefaultTdxGuestDevice returns true if tdxGuestPath=default.
 func UseDefaultTdxGuestDevice() bool {
 	return *tdxGuestPath == "default"
@@ -102,9 +107,40 @@ func GetQuote(d Device, reportData [64]byte) (*pb.QuoteV4, error) {
 	if len(quotebytes) > int(size) {
 		quotebytes = quotebytes[:size]
 	}
-	quote, err := abi.QuoteToProto(quotebytes)
+	return convertRawQuoteToProto(quotebytes)
+}
+// GetRawQuoteViaProvider use QuoteProvider to fetch quote in byte array format.
+func GetRawQuoteViaProvider(qp QuoteProvider, reportData [64]byte) ([]uint8, error) {
+	if err := qp.IsSupported(); err == nil {
+		return qp.GetRawQuote(reportData)
+	}
+	return fallbackToDeviceForRawQuote(reportData)
+}
+// GetQuoteViaProvider use QuoteProvider to fetch attestation quote.
+func GetQuoteViaProvider(qp QuoteProvider, reportData [64]byte) (*pb.QuoteV4, error) {
+	bytes, err := GetRawQuoteViaProvider(qp, reportData)
+	if err != nil {
+		return nil, err
+	}
+	return convertRawQuoteToProto(bytes)
+}
+// convertRawQuoteToProto converts raw quote in byte array format to proto.
+func convertRawQuoteToProto(rawQuote []byte) (*pb.QuoteV4, error) {
+	quote, err := abi.QuoteToProto(rawQuote)
 	if err != nil {
 		return nil, err
 	}
 	return quote, nil
+}
+
+// fallbackToDeviceForRawQuote opens tdx_guest device to fetch raw quote.
+func fallbackToDeviceForRawQuote(reportData [64]byte) ([]uint8, error) {
+	// Fall back to TDX device driver.
+	device, err := OpenDevice()
+	if err != nil {
+		return nil, fmt.Errorf("neither tdx device, nor configFs is available to fetch attestation quote")
+	}
+	bytes, _, err := GetRawQuote(device, reportData)
+	device.Close()
+	return bytes, err
 }

@@ -27,11 +27,12 @@ import (
 
 var devMu sync.Once
 var device Device
+var quoteProvider QuoteProvider
 var tests []test.TestCase
 
 const defaultTDXDevicePath = "/dev/tdx-guest"
 
-func initDevice() {
+func initialize() {
 	for _, tc := range test.TestCases() {
 		// Don't test faked errors when running real hardware tests.
 		if !UseDefaultTdxGuestDevice() && tc.WantErr != "" {
@@ -39,6 +40,11 @@ func initDevice() {
 		}
 		tests = append(tests, tc)
 	}
+	tdxTestQuoteProvider, err := test.TcQuoteProvider(tests)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create test quote provider: %v", err))
+	}
+	quoteProvider = tdxTestQuoteProvider
 	// Choose a mock device or a real device depending on the --tdx_guest_device_path flag.
 	if UseDefaultTdxGuestDevice() {
 		tdxTestDevice, err := test.TcDevice(tests)
@@ -58,7 +64,7 @@ func initDevice() {
 	device = client
 }
 func TestGetReport(t *testing.T) {
-	devMu.Do(initDevice)
+	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
 			got, err := getReport(device, tc.Input)
@@ -75,7 +81,7 @@ func TestGetReport(t *testing.T) {
 	}
 }
 func TestGetRawQuote(t *testing.T) {
-	devMu.Do(initDevice)
+	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
 			got, _, err := GetRawQuote(device, tc.Input)
@@ -92,7 +98,7 @@ func TestGetRawQuote(t *testing.T) {
 	}
 }
 func TestGetQuote(t *testing.T) {
-	devMu.Do(initDevice)
+	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
 			got, err := GetQuote(device, tc.Input)
@@ -105,7 +111,44 @@ func TestGetQuote(t *testing.T) {
 					t.Error(err)
 				}
 				if diff := cmp.Diff(got, quote, protocmp.Transform()); diff != "" {
-					t.Errorf("difference in quote: %s", diff)
+					t.Errorf("Difference in quote: %s", diff)
+				}
+			}
+		})
+	}
+}
+func TestGetRawQuoteViaProvider(t *testing.T) {
+	devMu.Do(initialize)
+	for _, tc := range test.TestCases() {
+		t.Run(tc.Name, func(t *testing.T) {
+			got, err := GetRawQuoteViaProvider(quoteProvider, tc.Input)
+			if !test.Match(err, tc.WantErr) {
+				t.Fatalf("GetRawQuoteViaProvider(quoteProvider, %v) = %v, %v. Want err: %q", tc.Input, got, err, tc.WantErr)
+			}
+			if tc.WantErr == "" {
+				want := tc.Quote
+				if !bytes.Equal(got, want) {
+					t.Errorf("GetRawQuoteViaProvider(quoteProvider, %v) = %v want %v", tc.Input, got, want)
+				}
+			}
+		})
+	}
+}
+func TestGetQuoteViaProvider(t *testing.T) {
+	devMu.Do(initialize)
+	for _, tc := range test.TestCases() {
+		t.Run(tc.Name, func(t *testing.T) {
+			got, err := GetQuoteViaProvider(quoteProvider, tc.Input)
+			if !test.Match(err, tc.WantErr) {
+				t.Fatalf("Expected %v got err: %v", err, tc.WantErr)
+			}
+			if tc.WantErr == "" {
+				quote, err := abi.QuoteToProto(tc.Quote)
+				if err != nil {
+					t.Error(err)
+				}
+				if diff := cmp.Diff(got, quote, protocmp.Transform()); diff != "" {
+					t.Errorf("Difference in quote: %s", diff)
 				}
 			}
 		})

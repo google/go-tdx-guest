@@ -16,6 +16,7 @@
 package testing
 
 import (
+	_ "embed"
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
@@ -49,19 +50,19 @@ var QeIdentityHeader = map[string][]string{
 // TestGetter is a local getter tied to the included sample quote
 var TestGetter = &Getter{
 	Responses: map[string]HTTPResponse{
-		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity": {
+		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity": HTTPResponse{
 			Header: QeIdentityHeader,
 			Body:   testdata.QeIdentityBody,
 		},
-		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000": {
+		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000": HTTPResponse{
 			Header: TcbInfoHeader,
 			Body:   testdata.TcbInfoBody,
 		},
-		"https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform&encoding=der": {
+		"https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform&encoding=der": HTTPResponse{
 			Header: PckCrlHeader,
 			Body:   testdata.PckCrlBody,
 		},
-		"https://certificates.trustedservices.intel.com/IntelSGXRootCA.der": {
+		"https://certificates.trustedservices.intel.com/IntelSGXRootCA.der": HTTPResponse{
 			Header: nil,
 			Body:   testdata.RootCrlBody,
 		},
@@ -101,6 +102,18 @@ func TestCases() []TestCase {
 			Quote:  testdata.RawQuote,
 		},
 	}
+}
+
+// TcQuoteProvider returns a mock quote provider populated from test cases inputs and expected outputs.
+func TcQuoteProvider(tcs []TestCase) (*TdxQuoteProvider, error) {
+	rawQuoteResponses := map[[labi.TdReportDataSize]byte][]uint8{}
+	for _, tc := range tcs {
+		rawQuoteResponses[tc.Input] = tc.Quote
+	}
+	return &TdxQuoteProvider{
+		isSupported:      true,
+		rawQuoteResponse: rawQuoteResponses,
+	}, nil
 }
 
 // TcDevice returns a mock device populated from test cases inputs and expected outputs.
