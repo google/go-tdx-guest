@@ -49,14 +49,17 @@ func (*MacOSDevice) Ioctl(_ uintptr, _ any) (uintptr, error) {
 
 // MacOsConfigFsQuoteProvider implements the QuoteProvider interface to fetch attestation quote via ConfigFS.
 type MacOsConfigFsQuoteProvider struct{}
+
 // IsSupported is not supported on MacOS.
 func (p *MacOsConfigFsQuoteProvider) IsSupported() error {
 	return fmt.Errorf("MacOS is unsupported")
 }
+
 // GetRawQuote is not supported on MacOS.
 func (p *MacOsConfigFsQuoteProvider) GetRawQuote(reportData [64]byte) ([]uint8, error) {
 	return nil, fmt.Errorf("MacOS is unsupported")
 }
+
 // GetQuoteProvider is not supported on MacOS.
 func GetQuoteProvider() (*MacOsConfigFsQuoteProvider, error) {
 	return nil, fmt.Errorf("MacOS is unsupported")

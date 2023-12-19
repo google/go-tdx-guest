@@ -16,7 +16,6 @@
 package testing
 
 import (
-	_ "embed"
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
@@ -50,19 +49,19 @@ var QeIdentityHeader = map[string][]string{
 // TestGetter is a local getter tied to the included sample quote
 var TestGetter = &Getter{
 	Responses: map[string]HTTPResponse{
-		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity": HTTPResponse{
+		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity": {
 			Header: QeIdentityHeader,
 			Body:   testdata.QeIdentityBody,
 		},
-		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000": HTTPResponse{
+		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000": {
 			Header: TcbInfoHeader,
 			Body:   testdata.TcbInfoBody,
 		},
-		"https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform&encoding=der": HTTPResponse{
+		"https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform&encoding=der": {
 			Header: PckCrlHeader,
 			Body:   testdata.PckCrlBody,
 		},
-		"https://certificates.trustedservices.intel.com/IntelSGXRootCA.der": HTTPResponse{
+		"https://certificates.trustedservices.intel.com/IntelSGXRootCA.der": {
 			Header: nil,
 			Body:   testdata.RootCrlBody,
 		},

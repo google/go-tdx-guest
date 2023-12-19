@@ -101,26 +101,26 @@ func runInterference(t testing.TB, c configfsi.Client, entryPath string, tc *run
 	tc.done <- 0
 }
 
-func runNoninterference(t testing.TB, c configfsi.Client, tc *runner) {
-	t.Helper()
-	for i := 0; i < tc.iterations; i++ {
-		nonce := makeNonce(tc.id)
-		resp, err := report.Get(c, &report.Request{
-			InBlob:    nonce,
-			Privilege: &report.Privilege{Level: (tc.id % 4)},
-		})
-		if err == nil {
-			err = checkOutblobExpectation(nonce, (tc.id % 4), resp.OutBlob)
-		}
-		if err != nil {
-			t.Error(err)
-			tc.done <- 1
-			return
-		}
-	}
-	t.Logf("Posting done for %d", tc.id)
-	tc.done <- 0
-}
+// func runNoninterference(t testing.TB, c configfsi.Client, tc *runner) {
+// 	t.Helper()
+// 	for i := 0; i < tc.iterations; i++ {
+// 		nonce := makeNonce(tc.id)
+// 		resp, err := report.Get(c, &report.Request{
+// 			InBlob:    nonce,
+// 			Privilege: &report.Privilege{Level: (tc.id % 4)},
+// 		})
+// 		if err == nil {
+// 			err = checkOutblobExpectation(nonce, (tc.id % 4), resp.OutBlob)
+// 		}
+// 		if err != nil {
+// 			t.Error(err)
+// 			tc.done <- 1
+// 			return
+// 		}
+// 	}
+// 	t.Logf("Posting done for %d", tc.id)
+// 	tc.done <- 0
+// }
 
 // clients-many concurrent routines attempt to get an output on the same entry with
 // different inblobs.
@@ -151,24 +151,24 @@ func nonceAnonceB(t testing.TB, clients, iterations int) {
 	t.Logf("doooone")
 }
 
-func noninterferenceByDesign(t testing.TB, clients, iterations int) {
-	t.Helper()
-	c := ReportV7(0)
-	complete := make(chan int)
-	for i := 0; i < clients; i++ {
-		go runNoninterference(t, c, &runner{
-			iterations: iterations,
-			id:         uint(i),
-			done:       complete})
-	}
-	// Each client should write to the channel.
-	for i := 0; i < clients; i++ {
-		code := <-complete
-		if code == 1 {
-			t.Fatalf("early failure")
-		}
-	}
-}
+// func noninterferenceByDesign(t testing.TB, clients, iterations int) {
+// 	t.Helper()
+// 	c := ReportV7(0)
+// 	complete := make(chan int)
+// 	for i := 0; i < clients; i++ {
+// 		go runNoninterference(t, c, &runner{
+// 			iterations: iterations,
+// 			id:         uint(i),
+// 			done:       complete})
+// 	}
+// 	// Each client should write to the channel.
+// 	for i := 0; i < clients; i++ {
+// 		code := <-complete
+// 		if code == 1 {
+// 			t.Fatalf("early failure")
+// 		}
+// 	}
+// }
 
 func BenchmarkReportGenerationInterference(b *testing.B) {
 	nonceAnonceB(b, 4, b.N)

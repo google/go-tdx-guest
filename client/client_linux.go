@@ -104,11 +104,13 @@ func (d *LinuxDevice) Ioctl(command uintptr, req any) (uintptr, error) {
 // LinuxConfigFsQuoteProvider implements the QuoteProvider interface to fetch
 // attestation quote via ConfigFS.
 type LinuxConfigFsQuoteProvider struct{}
+
 // IsSupported checks if TSM client can be created to use ConfigFS system.
 func (p *LinuxConfigFsQuoteProvider) IsSupported() error {
 	_, err := linuxtsm.MakeClient()
 	return err
 }
+
 // GetRawQuote returns byte format attestation quote via ConfigFS.
 func (p *LinuxConfigFsQuoteProvider) GetRawQuote(reportData [64]byte) ([]uint8, error) {
 	req := &report.Request{
@@ -122,6 +124,7 @@ func (p *LinuxConfigFsQuoteProvider) GetRawQuote(reportData [64]byte) ([]uint8, 
 	tdReport := resp.OutBlob
 	return tdReport, nil
 }
+
 // GetQuoteProvider returns an instance of LinuxConfigFsQuoteProvider.
 func GetQuoteProvider() (*LinuxConfigFsQuoteProvider, error) {
 	return &LinuxConfigFsQuoteProvider{}, nil

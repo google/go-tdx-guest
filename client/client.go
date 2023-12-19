@@ -40,6 +40,7 @@ type QuoteProvider interface {
 	IsSupported() error
 	GetRawQuote(reportData [64]byte) ([]uint8, error)
 }
+
 // UseDefaultTdxGuestDevice returns true if tdxGuestPath=default.
 func UseDefaultTdxGuestDevice() bool {
 	return *tdxGuestPath == "default"
@@ -109,6 +110,7 @@ func GetQuote(d Device, reportData [64]byte) (*pb.QuoteV4, error) {
 	}
 	return convertRawQuoteToProto(quotebytes)
 }
+
 // GetRawQuoteViaProvider use QuoteProvider to fetch quote in byte array format.
 func GetRawQuoteViaProvider(qp QuoteProvider, reportData [64]byte) ([]uint8, error) {
 	if err := qp.IsSupported(); err == nil {
@@ -116,6 +118,7 @@ func GetRawQuoteViaProvider(qp QuoteProvider, reportData [64]byte) ([]uint8, err
 	}
 	return fallbackToDeviceForRawQuote(reportData)
 }
+
 // GetQuoteViaProvider use QuoteProvider to fetch attestation quote.
 func GetQuoteViaProvider(qp QuoteProvider, reportData [64]byte) (*pb.QuoteV4, error) {
 	bytes, err := GetRawQuoteViaProvider(qp, reportData)
@@ -124,6 +127,7 @@ func GetQuoteViaProvider(qp QuoteProvider, reportData [64]byte) (*pb.QuoteV4, er
 	}
 	return convertRawQuoteToProto(bytes)
 }
+
 // convertRawQuoteToProto converts raw quote in byte array format to proto.
 func convertRawQuoteToProto(rawQuote []byte) (*pb.QuoteV4, error) {
 	quote, err := abi.QuoteToProto(rawQuote)
