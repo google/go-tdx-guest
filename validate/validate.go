@@ -303,6 +303,7 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 
 // TdxQuote validates fields of the protobuf representation of an attestation Quote
 // against expectations depending on supported quote formats - QuoteV4.
+// Does not check the attestation certificates or signature.
 func TdxQuote(quote any, options *Options) error {
 	if options == nil {
 		return vr.ErrOptionsNil

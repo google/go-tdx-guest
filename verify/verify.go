@@ -1236,7 +1236,7 @@ func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
 
 // TdxQuote verifies the protobuf representation of an attestation quote's signature
 // based on the quote's SignatureAlgo, provided the certificate chain is valid for
-// formats - QuoteV4, QuoteV5 etc.
+// formats - QuoteV4.
 func TdxQuote(quote any, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
