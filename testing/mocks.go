@@ -139,3 +139,22 @@ func (g *Getter) Get(url string) (map[string][]string, []byte, error) {
 	}
 	return v.Header, v.Body, nil
 }
+
+// TdxQuoteProvider represents a fake quote provider with pre-programmed responses.
+type TdxQuoteProvider struct {
+	isSupported      bool
+	rawQuoteResponse map[[labi.TdReportDataSize]byte][]uint8
+}
+
+// IsSupported checks if mock quote provider is supported.
+func (p *TdxQuoteProvider) IsSupported() error {
+	if p.isSupported {
+		return nil
+	}
+	return fmt.Errorf("configfs not supported")
+}
+
+// GetRawQuote returns pre-programmed response as raw quote.
+func (p *TdxQuoteProvider) GetRawQuote(reportData [64]byte) ([]uint8, error) {
+	return p.rawQuoteResponse[reportData], nil
+}

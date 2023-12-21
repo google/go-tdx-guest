@@ -103,6 +103,18 @@ func TestCases() []TestCase {
 	}
 }
 
+// TcQuoteProvider returns a mock quote provider populated from test cases inputs and expected outputs.
+func TcQuoteProvider(tcs []TestCase) (*TdxQuoteProvider, error) {
+	rawQuoteResponses := map[[labi.TdReportDataSize]byte][]uint8{}
+	for _, tc := range tcs {
+		rawQuoteResponses[tc.Input] = tc.Quote
+	}
+	return &TdxQuoteProvider{
+		isSupported:      true,
+		rawQuoteResponse: rawQuoteResponses,
+	}, nil
+}
+
 // TcDevice returns a mock device populated from test cases inputs and expected outputs.
 func TcDevice(tcs []TestCase) (*Device, error) {
 	reportResponses := map[[labi.TdReportDataSize]byte]any{}

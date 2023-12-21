@@ -45,20 +45,24 @@ var (
 	verbose = flag.Bool("v", false, "Enable verbose logging.")
 )
 
-func outputReport(device client.Device, data [labi.TdReportDataSize]byte, out io.Writer) error {
+func outputReport(data [labi.TdReportDataSize]byte, out io.Writer) error {
+	tdxQuoteProvider, err := client.GetQuoteProvider()
+	if err != nil {
+		return err
+	}
 	if *outform == "bin" {
-		bytes, _, err := client.GetRawQuote(device, data)
+		bytes, err := client.GetRawQuoteViaProvider(tdxQuoteProvider, data)
 		if err != nil {
 			return err
 		}
 		out.Write(bytes)
 		return nil
 	}
-	report, err := client.GetQuote(device, data)
+	quote, err := client.GetQuoteViaProvider(tdxQuoteProvider, data)
 	if err != nil {
 		return err
 	}
-	bytes, err := prototext.Marshal(report)
+	bytes, err := prototext.Marshal(quote)
 	if err != nil {
 		return err
 	}
@@ -133,14 +137,9 @@ func main() {
 			filetoclose.Close()
 		}
 	}()
-	device, err := client.OpenDevice()
-	if err != nil {
-		logger.Fatal(err)
-	}
-	defer device.Close()
 	var reportData64 [labi.TdReportDataSize]byte
 	copy(reportData64[:], reportData)
-	if err := outputReport(device, reportData64, outwriter); err != nil {
+	if err := outputReport(reportData64, outwriter); err != nil {
 		logger.Fatal(err)
 	}
 }
