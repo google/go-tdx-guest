@@ -282,7 +282,7 @@ func TestNegativeVerification(t *testing.T) {
 			name:        "Version byte Changed",
 			changeIndex: 0x00,
 			changeValue: 3,
-			wantErr:     "could not convert raw bytes to QuoteV4: Quote format not supported",
+			wantErr:     "could not convert raw bytes to QuoteV4: quote format not supported",
 		},
 		{
 			name:        "Signed data size byte Changed",

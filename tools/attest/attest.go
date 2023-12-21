@@ -76,7 +76,7 @@ func marshalAndWriteBytes(quote any, out io.Writer) error {
 		out.Write(bytes)
 		return nil
 	default:
-		return fmt.Errorf("Unsupported quote type: %T", quote)
+		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
 }
 

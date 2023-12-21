@@ -182,7 +182,7 @@ const (
 
 var (
 	// ErrQuoteNil error returned when Quote is nil
-	ErrQuoteNil = errors.New("Quote is nil")
+	ErrQuoteNil = errors.New("quote is nil")
 
 	// ErrQuoteV4Nil error returned when QuoteV4 is nil
 	ErrQuoteV4Nil = errors.New("QuoteV4 is nil")
@@ -239,7 +239,7 @@ func QuoteToProto(b []uint8) (any, error) {
 	case intelQuoteV4Version:
 		return quoteToProtoV4(b)
 	default:
-		return nil, fmt.Errorf("Quote format not supported")
+		return nil, fmt.Errorf("quote format not supported")
 	}
 }
 

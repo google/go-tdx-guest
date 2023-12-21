@@ -311,7 +311,7 @@ func TdxQuote(quote any, options *Options) error {
 	case *pb.QuoteV4:
 		return tdxQuoteV4(q, options)
 	default:
-		return fmt.Errorf("Unsupported quote type: %T", quote)
+		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
 }
 

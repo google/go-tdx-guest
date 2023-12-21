@@ -608,7 +608,7 @@ func extractChainFromQuote(quote any) (*PCKCertificateChain, error) {
 	case *pb.QuoteV4:
 		return extractChainFromQuoteV4(q)
 	default:
-		return nil, fmt.Errorf("Unsupported quote type: %T", quote)
+		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}
 }
 
