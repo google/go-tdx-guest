@@ -23,7 +23,14 @@ import (
 )
 
 func TestQuoteToProto(t *testing.T) {
-	_, err := QuoteToProto(test.RawQuote)
+	expectedError := "unable to determine quote format since bytes length is less than 2 bytes"
+	var emptyRawQuote []uint8
+	_, err := QuoteToProto(emptyRawQuote)
+	if err == nil || err.Error() != expectedError {
+		t.Errorf("error found: %v, want error: %s", err, expectedError)
+	}
+
+	_, err = QuoteToProto(test.RawQuote)
 	if err != nil {
 		t.Fatal(err)
 	}

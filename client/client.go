@@ -126,35 +126,11 @@ func getRawQuoteViaProvider(qp QuoteProvider, reportData [64]byte) ([]uint8, err
 // into proto.
 // Supported quote formats - QuoteV4.
 func GetQuote(quoteProvider any, reportData [64]byte) (any, error) {
-	switch qp := quoteProvider.(type) {
-	case Device:
-		return getQuoteViaDevice(qp, reportData)
-	case QuoteProvider:
-		return getQuoteViaProvider(qp, reportData)
-	}
-	return nil, fmt.Errorf("unsupported quote provider type: %T", quoteProvider)
-}
-
-// getQuoteViaDevice call GetRawQuote to get the quote in byte array and convert it into proto.
-func getQuoteViaDevice(d Device, reportData [64]byte) (any, error) {
-	quotebytes, err := getRawQuoteViaDevice(d, reportData)
+	quotebytes, err := GetRawQuote(quoteProvider, reportData)
 	if err != nil {
 		return nil, err
 	}
 	quote, err := abi.QuoteToProto(quotebytes)
-	if err != nil {
-		return nil, err
-	}
-	return quote, nil
-}
-
-// getQuoteViaProvider use QuoteProvider to fetch attestation quote.
-func getQuoteViaProvider(qp QuoteProvider, reportData [64]byte) (any, error) {
-	bytes, err := getRawQuoteViaProvider(qp, reportData)
-	if err != nil {
-		return nil, err
-	}
-	quote, err := abi.QuoteToProto(bytes)
 	if err != nil {
 		return nil, err
 	}

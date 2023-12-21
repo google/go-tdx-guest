@@ -225,17 +225,24 @@ func clone(b []byte) []byte {
 }
 
 // determineQuoteFormat returns the quote format version from the header.
-func determineQuoteFormat(b []uint8) uint32 {
+func determineQuoteFormat(b []uint8) (uint32, error) {
+	if len(b) < headerVersionEnd {
+		return 0, fmt.Errorf("unable to determine quote format since bytes length is less than %d bytes", headerVersionEnd)
+	}
 	data := clone(b)
 	header := &pb.Header{}
 	header.Version = uint32(binary.LittleEndian.Uint16(data[headerVersionStart:headerVersionEnd]))
-	return header.Version
+	return header.Version, nil
 }
 
 // QuoteToProto creates a Quote from the Intel's attestation quote byte array in Intel's ABI format.
 // Supported quote formats - QuoteV4.
 func QuoteToProto(b []uint8) (any, error) {
-	switch determineQuoteFormat(b) {
+	quoteFormat, err := determineQuoteFormat(b)
+	if err != nil {
+		return nil, err
+	}
+	switch quoteFormat {
 	case intelQuoteV4Version:
 		return quoteToProtoV4(b)
 	default:
