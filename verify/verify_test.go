@@ -24,6 +24,7 @@ import (
 
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
+	pb "github.com/google/go-tdx-guest/proto/tdx"
 	testcases "github.com/google/go-tdx-guest/testing"
 	"github.com/google/go-tdx-guest/testing/testdata"
 	"github.com/google/logger"
@@ -251,13 +252,16 @@ func TestRawQuoteVerifyWithoutCollateral(t *testing.T) {
 		t.Error(err)
 	}
 }
-
-func TestVerifyQuote(t *testing.T) {
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+func TestVerifyQuoteV4(t *testing.T) {
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("Quote is not a QuoteV4")
+	}
+	pckChain, err := extractChainFromQuote(anyQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +282,7 @@ func TestNegativeVerification(t *testing.T) {
 			name:        "Version byte Changed",
 			changeIndex: 0x00,
 			changeValue: 3,
-			wantErr:     "could not convert raw bytes to QuoteV4: parsing header failed: version 3 not supported",
+			wantErr:     "could not convert raw bytes to QuoteV4: Quote format not supported",
 		},
 		{
 			name:        "Signed data size byte Changed",
@@ -438,7 +442,7 @@ func TestNegativeObtainAndVerifyCollateral(t *testing.T) {
 	}
 }
 
-func TestVerifyUsingTcbInfo(t *testing.T) {
+func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
@@ -448,11 +452,11 @@ func TestVerifyUsingTcbInfo(t *testing.T) {
 	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := extractChainFromQuote(anyQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,13 +471,16 @@ func TestVerifyUsingTcbInfo(t *testing.T) {
 	// when compared to the TD Quote Body's TeeTcbSvn value.
 	// For the purpose of testing, converting all SVNs value to 0
 	setTcbSvnValues(0, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
-
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
+	}
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
 		t.Error(err)
 	}
 }
 
-func TestNegativeVerifyUsingTcbInfo(t *testing.T) {
+func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
@@ -483,9 +490,13 @@ func TestNegativeVerifyUsingTcbInfo(t *testing.T) {
 	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
 	}
 	chain, err := extractChainFromQuote(quote)
 	if err != nil {
@@ -528,16 +539,20 @@ func TestNegativeVerifyUsingTcbInfo(t *testing.T) {
 	}
 }
 
-func TestVerifyUsingQeIdentity(t *testing.T) {
+func TestVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
 	if err := getQeIdentity(getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("Quote is not a QuoteV4")
 	}
 
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
@@ -548,16 +563,20 @@ func TestVerifyUsingQeIdentity(t *testing.T) {
 	}
 }
 
-func TestNegativeVerifyUsingQeIdentity(t *testing.T) {
+func TestNegativeVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
 	if err := getQeIdentity(getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
 	}
 
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
@@ -594,7 +613,7 @@ func TestNegativeVerifyUsingQeIdentity(t *testing.T) {
 	}
 }
 
-func TestNegativeTcbInfoTcbStatus(t *testing.T) {
+func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
@@ -604,9 +623,13 @@ func TestNegativeTcbInfoTcbStatus(t *testing.T) {
 	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
 	}
 	chain, err := extractChainFromQuote(quote)
 	if err != nil {
@@ -643,16 +666,20 @@ func TestNegativeTcbInfoTcbStatus(t *testing.T) {
 	}
 }
 
-func TestNegativeCheckQeStatus(t *testing.T) {
+func TestNegativeCheckQeStatusV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
 	if err := getQeIdentity(getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
 		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
 	}
 
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity

@@ -45,7 +45,7 @@ func TestQuoteToAbiBytes(t *testing.T) {
 
 func TestNilToAbiBytesConversions(t *testing.T) {
 
-	if _, err := QuoteToAbiBytes(nil); err != ErrQuoteV4Nil {
+	if _, err := QuoteToAbiBytes(nil); err != ErrQuoteNil {
 		t.Error(err)
 	}
 	if _, err := signedDataToAbiBytes(nil); err != ErrQuoteV4AuthDataNil {
@@ -76,12 +76,12 @@ func TestNilToAbiBytesConversions(t *testing.T) {
 
 func TestInvalidConversionsToAbiBytes(t *testing.T) {
 	expectedErrors := []string{
-		"QuoteV4 invalid: QuoteV4 Header error: header is empty",
+		"QuoteV4 invalid: QuoteV4 Header error: header is nil",
 		"QuoteV4 AuthData invalid: signature size is 0 bytes. Expected 64 bytes",
 		"certification data invalid: certification data type invalid, got 0, expected 6",
 		"certification data invalid: certification data type invalid, got 7, expected 6",
-		"certification data invalid: QE Report certification data error: QE Report certification data is empty",
-		"QE Report certification data invalid: QE Report error: QE Report is empty",
+		"certification data invalid: QE Report certification data error: QE Report certification data is nil",
+		"QE Report certification data invalid: QE Report error: QE Report is nil",
 		"QE AuthData invalid: parsed data size is 0 bytes. Expected 1 bytes",
 		"PCK certificate chain data invalid: PCK certificate chain data type invalid, got 0, expected 5",
 		"PCK certificate chain data invalid: PCK certificate chain data type invalid, got 7, expected 5",

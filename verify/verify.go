@@ -603,7 +603,16 @@ func verifyCollateral(options *Options) error {
 	return checkCollateralExpiration(collateral, options)
 }
 
-func extractChainFromQuote(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
+func extractChainFromQuote(quote any) (*PCKCertificateChain, error) {
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		return extractChainFromQuoteV4(q)
+	default:
+		return nil, fmt.Errorf("Unsupported quote type: %T", quote)
+	}
+}
+
+func extractChainFromQuoteV4(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 	certChainBytes := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetPckCertificateChainData().GetPckCertChain()
 	if certChainBytes == nil {
 		return nil, ErrPCKCertChainNil
@@ -1182,7 +1191,16 @@ func verifyQeIdentity(options *Options) error {
 	return nil
 }
 
-func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
+func verifyEvidence(quote any, options *Options) error {
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		return verifyEvidenceV4(q, options)
+	default:
+		return fmt.Errorf("unsupported quote type: %T", quote)
+	}
+}
+
+func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
 	if quote.GetHeader().GetTeeType() != abi.TeeTDX {
 		return abi.ErrTeeType
 	}
@@ -1216,13 +1234,24 @@ func verifyEvidence(quote *pb.QuoteV4, options *Options) error {
 	return verifyQuote(quote, options)
 }
 
-// TdxQuote verifies the protobuf representation of an attestation quote's signature based
-// on the quote's SignatureAlgo, provided the certificate chain is valid.
-func TdxQuote(quote *pb.QuoteV4, options *Options) error {
+// TdxQuote verifies the protobuf representation of an attestation quote's signature
+// based on the quote's SignatureAlgo, provided the certificate chain is valid for
+// formats - QuoteV4, QuoteV5 etc.
+func TdxQuote(quote any, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
 	}
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		return tdxQuoteV4(q, options)
+	default:
+		return fmt.Errorf("unsupported quote type: %T", quote)
+	}
+}
 
+// tdxQuoteV4 verifies the QuoteV4 protobuf representation of an attestation quote's signature
+// based on the quote's SignatureAlgo, provided the certificate chain is valid.
+func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 	logger.V(1).Info("Checking that the quote parameters meet the required size")
 	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
 	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
@@ -1233,7 +1262,7 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	logger.V(1).Info("Quote parameters meet the required size")
 
 	logger.V(1).Info("Extracting PCK certificate chain from the quote")
-	chain, err := extractChainFromQuote(quote)
+	chain, err := extractChainFromQuoteV4(quote)
 	if err != nil {
 		return err
 	}
@@ -1266,7 +1295,7 @@ func TdxQuote(quote *pb.QuoteV4, options *Options) error {
 	if options.Now.IsZero() {
 		options.Now = time.Now()
 	}
-	return verifyEvidence(quote, options)
+	return verifyEvidenceV4(quote, options)
 }
 
 // RawTdxQuote verifies the raw bytes representation of an attestation quote

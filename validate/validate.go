@@ -301,12 +301,23 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-// TdxQuote validates fields of the protobuf representation of an attestation Quote against
-// expectations. Does not check the attestation certificates or signature.
-func TdxQuote(quote *pb.QuoteV4, options *Options) error {
+// TdxQuote validates fields of the protobuf representation of an attestation Quote
+// against expectations depending on supported quote formats - QuoteV4.
+func TdxQuote(quote any, options *Options) error {
 	if options == nil {
 		return vr.ErrOptionsNil
 	}
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		return tdxQuoteV4(q, options)
+	default:
+		return fmt.Errorf("Unsupported quote type: %T", quote)
+	}
+}
+
+// tdxQuoteV4 validates QuoteV4 fields of the protobuf representation of an attestation Quote
+// against expectations. Does not check the attestation certificates or signature.
+func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 	if err := abi.CheckQuoteV4(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}

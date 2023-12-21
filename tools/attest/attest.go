@@ -27,6 +27,7 @@ import (
 
 	"github.com/google/go-tdx-guest/client"
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
+	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/logger"
 	"google.golang.org/protobuf/encoding/prototext"
 )
@@ -51,24 +52,34 @@ func outputReport(data [labi.TdReportDataSize]byte, out io.Writer) error {
 		return err
 	}
 	if *outform == "bin" {
-		bytes, err := client.GetRawQuoteViaProvider(tdxQuoteProvider, data)
+		bytes, err := client.GetRawQuote(tdxQuoteProvider, data)
 		if err != nil {
 			return err
 		}
 		out.Write(bytes)
 		return nil
 	}
-	quote, err := client.GetQuoteViaProvider(tdxQuoteProvider, data)
+	quote, err := client.GetQuote(tdxQuoteProvider, data)
 	if err != nil {
 		return err
 	}
-	bytes, err := prototext.Marshal(quote)
-	if err != nil {
-		return err
-	}
-	out.Write(bytes)
-	return nil
+	return marshalAndWriteBytes(quote, out)
 }
+
+func marshalAndWriteBytes(quote any, out io.Writer) error {
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		bytes, err := prototext.Marshal(q)
+		if err != nil {
+			return err
+		}
+		out.Write(bytes)
+		return nil
+	default:
+		return fmt.Errorf("Unsupported quote type: %T", quote)
+	}
+}
+
 func outWriter() (io.Writer, *os.File, error) {
 	if *out == "" {
 		return os.Stdout, nil, nil
