@@ -90,15 +90,19 @@ func TestTdxQuote(t *testing.T) {
 
 	nonce12345 := mknonce([]byte{1, 2, 3, 4, 5})
 
-	quoteFn := func(nonce []byte) *pb.QuoteV4 {
+	quoteFn := func(nonce []byte) any {
 		quote, err := abi.QuoteToProto(testdata.RawQuote)
 		if err != nil {
 			t.Fatal(err)
 		}
 		data := make([]byte, abi.ReportDataSize)
 		copy(data, nonce[:])
-		quote.TdQuoteBody.ReportData = data
-
+		switch q := quote.(type) {
+		case *pb.QuoteV4:
+			q.TdQuoteBody.ReportData = data
+		default:
+			t.Fatal("unsupported quote type")
+		}
 		return quote
 	}
 	quoteSample := quoteFn(reportData)
@@ -106,7 +110,7 @@ func TestTdxQuote(t *testing.T) {
 
 	type testCase struct {
 		name    string
-		quote   *pb.QuoteV4
+		quote   any
 		opts    *Options
 		wantErr string
 	}

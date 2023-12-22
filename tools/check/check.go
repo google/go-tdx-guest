@@ -114,7 +114,7 @@ var (
 	}
 )
 
-func parseQuoteBytes(b []byte) (*pb.QuoteV4, error) {
+func parseQuoteBytes(b []byte) (any, error) {
 	quote, err := abi.QuoteToProto(b)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse the TDX Quote from %q: %v", *infile, err)
@@ -123,7 +123,7 @@ func parseQuoteBytes(b []byte) (*pb.QuoteV4, error) {
 	return quote, nil
 }
 
-func parseQuote(b []byte) (*pb.QuoteV4, error) {
+func parseQuote(b []byte) (any, error) {
 	switch *inform {
 	case "bin":
 		return parseQuoteBytes(b)
@@ -164,7 +164,7 @@ func parseUint(p string, bits int) (uint64, error) {
 	return info64, nil
 }
 
-func readQuote() (*pb.QuoteV4, error) {
+func readQuote() (any, error) {
 	var in io.Reader
 	var f *os.File
 	if *infile == "-" {

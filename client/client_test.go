@@ -84,7 +84,7 @@ func TestGetRawQuote(t *testing.T) {
 	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
-			got, _, err := GetRawQuote(device, tc.Input)
+			got, err := GetRawQuote(device, tc.Input)
 			if !test.Match(err, tc.WantErr) {
 				t.Fatalf("GetRawQuote(device, %v) = %v, %v. Want err: %q", tc.Input, got, err, tc.WantErr)
 			}
@@ -121,7 +121,7 @@ func TestGetRawQuoteViaProvider(t *testing.T) {
 	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
-			got, err := GetRawQuoteViaProvider(quoteProvider, tc.Input)
+			got, err := GetRawQuote(quoteProvider, tc.Input)
 			if !test.Match(err, tc.WantErr) {
 				t.Fatalf("GetRawQuoteViaProvider(quoteProvider, %v) = %v, %v. Want err: %q", tc.Input, got, err, tc.WantErr)
 			}
@@ -138,7 +138,7 @@ func TestGetQuoteViaProvider(t *testing.T) {
 	devMu.Do(initialize)
 	for _, tc := range test.TestCases() {
 		t.Run(tc.Name, func(t *testing.T) {
-			got, err := GetQuoteViaProvider(quoteProvider, tc.Input)
+			got, err := GetQuote(quoteProvider, tc.Input)
 			if !test.Match(err, tc.WantErr) {
 				t.Fatalf("Expected %v got err: %v", err, tc.WantErr)
 			}

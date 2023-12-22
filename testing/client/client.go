@@ -41,3 +41,13 @@ func GetTdxGuest(tcs []test.TestCase, tb testing.TB) client.Device {
 	}
 	return client
 }
+
+// GetMockTdxQuoteProvider is a testing helper function that produces a fake TDX quote provider.
+func GetMockTdxQuoteProvider(tcs []test.TestCase, tb testing.TB) client.QuoteProvider {
+	tb.Helper()
+	tdxTestQuoteProvider, err := test.TcQuoteProvider(tcs)
+	if err != nil {
+		tb.Fatalf("Failed to create test quote provider: %v", err)
+	}
+	return tdxTestQuoteProvider
+}

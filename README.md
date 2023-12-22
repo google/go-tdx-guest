@@ -1,9 +1,10 @@
 # TDX Guest
 
 
-This project offers libraries for a simple wrapper around the `/dev/tdx-guest`
-device in Linux, as well as a library for attestation verification of
-fundamental components of an attestation quote.
+This project offers libraries for a simple wrapper around quote providing tools
+such as the `go-configfs-tsm` library, or the `/dev/tdx_guest` device in Linux,
+as well as a library for attestation verification of fundamental components of
+an attestation quote.
 
 
 This project is split into two complementary roles. The first role is producing
@@ -19,26 +20,37 @@ This library should be used within the confidential workload to collect an
 attestation quote along with requisite certificates.
 
 
-Your main interactions with it will be to open the device, get an attestation
-quote with your provided 64 bytes of user data (typically a nonce), and then
-close the device. For convenience, the attestation with its associated
-certificates can be collected in a wire-transmittable protocol buffer format.
+Your main interactions with it will be to first get the quote provider, or
+open the device, then get an attestation quote with your provided 64 bytes of
+user data (typically a nonce), and then close the device. For convenience, the
+attestation with its associated certificates can be collected in a
+wire-transmittable protocol buffer format.
+
+
+### `func GetQuoteProvider() (*LinuxConfigFsQuoteProvider, error)`
+
+
+This function creates an instance of a quote provider which uses the go-configfs-tsm
+library to fetch attestation quotes via ConfigFS.
 
 
 ### `func OpenDevice() (*LinuxDevice, error)`
 
 
-This function creates a file descriptor to the `/dev/tdx-guest` device and
+This function creates a file descriptor to the `/dev/tdx_guest` device and
 returns an object that has methods encapsulating commands to the device. When
 done, remember to `Close()` the device.
+Note:- The Device interface is deprecated, and use of quote provider interface
+is recommended for fetching attestation quote.
 
 
-### `func GetQuote(d Device, reportData [64]byte) (*pb.QuoteV4, error)`
+### `func GetQuote(quoteProvider any, reportData [64]byte) (any, error)`
 
 
-This function takes an object implementing the `Device` interface (e.g., a
-`LinuxDevice`) and returns the protocol buffer representation of the attestation
-quote.
+This function takes an object implementing either the `QuoteProvider` interface
+(e.g. `LinuxConfigFsQuoteProvider`), or the `Device` interface (e.g., a `LinuxDevice`)
+along with report data which typically consists of a nonce value.
+It returns the protocol buffer representation of the attestation quote.
 
 
 You can use `GetRawQuote` to get the TDX Quote in byte array format.
