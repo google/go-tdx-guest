@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/google/go-cmp v0.5.7
+	github.com/google/go-configfs-tsm v0.2.2
 	github.com/google/go-sev-guest v0.8.0
 	github.com/google/logger v1.1.1
 	go.uber.org/multierr v1.11.0
