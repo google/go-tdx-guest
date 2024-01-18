@@ -639,8 +639,12 @@ func extractChainFromQuoteV4(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 	logger.V(1).Info("Intermediate certificate has been extracted from the certificate chain")
 
 	root, rem := pem.Decode(rem)
-	if root == nil || len(rem) != 0 || root.Type != certificateType {
+	if root == nil || root.Type != certificateType {
 		return nil, ErrPCKCertChainInvalid
+	}
+
+	if len(rem) != 0 && !bytes.Equal(rem, []byte{0x00}) { // The final byte of the certificate chain can be a null byte.
+		return nil, fmt.Errorf("unexpected trailing bytes were found in PCK Certificate Chain: %d byte(s)", len(rem))
 	}
 
 	rootCert, err := x509.ParseCertificate(root.Bytes)
