@@ -60,13 +60,14 @@ func TestParsePckChain(t *testing.T) {
 	if _, err := extractChainFromQuote(quote); err != nil {
 		t.Fatal(err)
 	}
+
 	certChain := quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain
 	certChain = append(certChain, 0)
 	quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain = certChain
-
 	if _, err := extractChainFromQuote(quote); err != nil {
 		t.Error(err)
 	}
+
 	certChain[len(certChain)-1] = 1
 	quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain = certChain
 	if _, err := extractChainFromQuote(quote); err == nil {
