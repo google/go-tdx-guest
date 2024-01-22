@@ -643,7 +643,8 @@ func extractChainFromQuoteV4(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
 		return nil, ErrPCKCertChainInvalid
 	}
 
-	if len(rem) != 0 && !bytes.Equal(rem, []byte{0x00}) { // The final byte of the certificate chain can be a null byte.
+	// The final byte of the certificate chain can be a null byte.
+	if len(rem) != 0 && !bytes.Equal(rem, []byte{0x00}) {
 		return nil, fmt.Errorf("unexpected trailing bytes were found in PCK Certificate Chain: %d byte(s)", len(rem))
 	}
 
