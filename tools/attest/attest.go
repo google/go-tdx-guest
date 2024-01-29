@@ -44,6 +44,7 @@ var (
 	out = flag.String("out", "", "Path to output file to write attestation report to. "+
 		"If unset, outputs to stdout.")
 	verbose = flag.Bool("v", false, "Enable verbose logging.")
+	verbosity = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output")
 )
 
 func outputReport(data [labi.TdReportDataSize]byte, out io.Writer) error {
@@ -130,8 +131,9 @@ func parseBytes(name string, in io.Reader, inform string, byteSize int) ([]byte,
 	}
 }
 func main() {
-	logger.Init("", *verbose, false, os.Stderr)
 	flag.Parse()
+	logger.Init("", *verbose, false, os.Stderr)
+	logger.SetLevel(logger.Level(*verbosity))
 	reportData, err := parseBytes("-in", strings.NewReader(*reportDataStr), *inform, labi.TdReportDataSize)
 	if err != nil {
 		logger.Fatal(err)
