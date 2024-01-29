@@ -66,7 +66,7 @@ var (
 		("A path to a serialized check.Config protobuf. Any individual field flags will" +
 			" overwrite the message's associated field. By default, the file will be unmarshalled as binary," +
 			" but if it ends in .textproto, it will be unmarshalled as prototext instead."))
-	quiet   = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
+	quiet     = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
 	verbosity = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output")
 
 	qevendoridS    = flag.String("qe_vendor_id", "", "The expected QE_VENDOR_ID field as a hex string. Must encode 16 bytes. Unchecked if unset.")
