@@ -43,7 +43,7 @@ var (
 		"If -inform=auto, first check with base64 and last with hex.")
 	out = flag.String("out", "", "Path to output file to write attestation report to. "+
 		"If unset, outputs to stdout.")
-	verbose = flag.Bool("v", false, "Enable verbose logging.")
+	verbose   = flag.Bool("v", false, "Enable verbose logging.")
 	verbosity = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output")
 )
 
