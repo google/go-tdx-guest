@@ -50,7 +50,7 @@ Default is empty, interpreted as stdout.
 
 ### `verbose`
 
-If set, then logger appends INFO and WARNING logs to Stdout. Default logger has verbosity set to `0`, so verbosity option should be set to appropriate value to append INFO and WARN logs at variable verbosity levels to Stdout.
+If set, then the logger can append INFO and WARNING logs to stdout as per the verbosity level. Default logger has verbosity set to `0`, so verbosity option should be set to appropriate value to append INFO and WARN logs at variable verbosity levels to stdout.
 
 Default value is `false`.
 
