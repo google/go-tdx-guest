@@ -78,7 +78,7 @@ func GetRawQuote(quoteProvider any, reportData [64]byte) ([]uint8, error) {
 // getRawQuoteViaDevice uses TDX device driver to call getReport for report and convert it to
 // quote using an ioctl call.
 func getRawQuoteViaDevice(d Device, reportData [64]byte) ([]uint8, error) {
-	logger.V(1).Info("Get raw quote via Device")
+	logger.V(1).Info("Get raw TDX quote via Device")
 	tdReport, err := getReport(d, reportData)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func getRawQuoteViaDevice(d Device, reportData [64]byte) ([]uint8, error) {
 // getRawQuoteViaProvider use QuoteProvider to fetch quote in byte array format.
 func getRawQuoteViaProvider(qp QuoteProvider, reportData [64]byte) ([]uint8, error) {
 	if err := qp.IsSupported(); err == nil {
-		logger.V(1).Info("Get raw quote via QuoteProvider")
+		logger.V(1).Info("Get raw TDX quote via QuoteProvider")
 		quote, err := qp.GetRawQuote(reportData)
 		return quote, err
 	}

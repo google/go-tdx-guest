@@ -31,6 +31,12 @@ Default value is `bin`.
 
 If set, doesn't write to stdout. All results are communicated through exit code.
 
+### `verbosity`
+
+Used to set the verbosity of logger, where higher number means more verbose output.
+
+Default value is `0`.
+
 ### `check_crl`
 
 Checks if the PCK certificate and the intermediate certificate of the PCK
