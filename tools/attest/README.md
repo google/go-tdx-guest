@@ -46,3 +46,16 @@ Default value is `bin`.
 Path to output file to write attestation report to.
 
 Default is empty, interpreted as stdout.
+
+
+### `verbose`
+
+If set, then the logger can append INFO and WARNING logs to stdout as per the verbosity level. Default logger has verbosity set to `0`, so verbosity option should be set to appropriate value to append INFO and WARN logs at variable verbosity levels to stdout.
+
+Default value is `false`.
+
+### `verbosity`
+
+Used to set the verbosity of logger, where higher number means more verbose output.
+
+Default value is `0`.

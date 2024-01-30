@@ -29,7 +29,13 @@ Default value is `bin`.
 
 ### `quiet`
 
-If set, doesn't write to stdout. All results are communicated through exit code.
+If set, doesn't write exit errors to Stdout. All results are communicated through exit code.
+
+### `verbosity`
+
+Used to set the verbosity of logger, where higher number means more verbose output.
+
+Default value is `0`.
 
 ### `check_crl`
 
