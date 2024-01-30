@@ -29,7 +29,7 @@ Default value is `bin`.
 
 ### `quiet`
 
-If set, doesn't write to stdout. All results are communicated through exit code.
+If set, doesn't write exit errors to Stdout. All results are communicated through exit code.
 
 ### `verbosity`
 
