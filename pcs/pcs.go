@@ -76,16 +76,17 @@ type TdxTcbInfo struct {
 
 // TcbInfo struct is used to map response from tcbInfo field
 type TcbInfo struct {
-	ID                      string     `json:"id"`
-	Version                 byte       `json:"version"`
-	IssueDate               time.Time  `json:"issueDate"`
-	NextUpdate              time.Time  `json:"nextUpdate"`
-	Fmspc                   string     `json:"fmspc"`
-	PceID                   string     `json:"pceId"`
-	TcbType                 byte       `json:"tcbType"`
-	TcbEvaluationDataNumber int        `json:"tcbEvaluationDataNumber"`
-	TdxModule               TdxModule  `json:"tdxModule"`
-	TcbLevels               []TcbLevel `json:"tcbLevels"`
+	ID                      string              `json:"id"`
+	Version                 byte                `json:"version"`
+	IssueDate               time.Time           `json:"issueDate"`
+	NextUpdate              time.Time           `json:"nextUpdate"`
+	Fmspc                   string              `json:"fmspc"`
+	PceID                   string              `json:"pceId"`
+	TcbType                 byte                `json:"tcbType"`
+	TcbEvaluationDataNumber int                 `json:"tcbEvaluationDataNumber"`
+	TdxModule               TdxModule           `json:"tdxModule"`
+	TdxModuleIdentities     []TdxModuleIdentity `json:"tdxModuleIdentities"`
+	TcbLevels               []TcbLevel          `json:"tcbLevels"`
 }
 
 // TdxModule struct is used to map response from tcbInfo for tdxModule field
@@ -93,6 +94,15 @@ type TdxModule struct {
 	Mrsigner       HexBytes `json:"mrsigner"`
 	Attributes     HexBytes `json:"attributes"`
 	AttributesMask HexBytes `json:"attributesMask"`
+}
+
+// TdxModuleIdentity struct is used to map response from tcbInfo for TdxModuleIdentity field
+type TdxModuleIdentity struct {
+	ID             string     `json:"id"`
+	Mrsigner       HexBytes   `json:"mrsigner"`
+	Attributes     HexBytes   `json:"attributes"`
+	AttributesMask HexBytes   `json:"attributesMask"`
+	TcbLevels      []TcbLevel `json:"tcbLevels"`
 }
 
 // TcbLevel struct is used to map TCB Level field
