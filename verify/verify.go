@@ -1398,5 +1398,4 @@ func init() {
 
 	// Initialize logger
 	logger.Init("", false, false, os.Stdout)
-	logger.SetLevel(2)
 }
