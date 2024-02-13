@@ -336,7 +336,7 @@ func populateConfig() error {
 			*dest = value
 		}
 	}
-	setRtmrs := func(dest *[][]byte, name, flag string) error {
+	setRtmrs := func(dest *[][]byte, _, flag string) error {
 		if flag != "" {
 			val, err := parseRtmrs(flag)
 			if err != nil {

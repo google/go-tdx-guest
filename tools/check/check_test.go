@@ -90,7 +90,7 @@ func setField(p *ccpb.Policy, policy string, name string, value any) {
 }
 
 func bytesSetter(name string, policy string) setterFn {
-	return func(p *ccpb.Policy, value string, t *testing.T) bool {
+	return func(p *ccpb.Policy, value string, _ *testing.T) bool {
 		v, err := hex.DecodeString(value)
 		if err != nil {
 			return true
@@ -101,7 +101,7 @@ func bytesSetter(name string, policy string) setterFn {
 }
 
 func uint32setter(name string, policy string) setterFn {
-	return func(p *ccpb.Policy, value string, t *testing.T) bool {
+	return func(p *ccpb.Policy, value string, _ *testing.T) bool {
 		u, err := strconv.ParseUint(value, 10, 32)
 		if err != nil {
 			return true
