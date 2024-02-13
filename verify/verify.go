@@ -901,10 +901,10 @@ func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIden
 					return &tcbLevel, nil
 				}
 			}
-			return nil, fmt.Errorf("Missing matching TDX Module Identity TCB Level (ISVSVN: %d)", tdxModuleIsvSvn)
+			return nil, fmt.Errorf("missing matching TDX Module Identity TCB Level (ISVSVN: %d)", tdxModuleIsvSvn)
 		}
 	}
-	return nil, fmt.Errorf("Missing matching TDX Module Identity (%q) for given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
+	return nil, fmt.Errorf("missing matching TDX Module Identity (%q) for given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
 }
 
 func getMatchingTcbLevel(tcbLevels []pcs.TcbLevel, tdReport *pb.TDQuoteBody, pckCertPceSvn uint16, pckCertCPUSvnComponents []byte) (pcs.TcbLevel, error) {
@@ -945,7 +945,7 @@ func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pck
 		}
 		logger.V(2).Info("Tdx Module TCB Status found: ", matchingTdxModuleTcbLevel.TcbStatus)
 		if matchingTdxModuleTcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
-			return fmt.Errorf("Tdx Module TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTdxModuleTcbLevel.TcbStatus)
+			return fmt.Errorf("TDX Module TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTdxModuleTcbLevel.TcbStatus)
 		}
 	}
 
