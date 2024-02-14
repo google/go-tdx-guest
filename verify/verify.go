@@ -169,6 +169,7 @@ const (
 	tcbInfoID                      = "TDX"
 	qeIdentityID                   = "TD_QE"
 	tcbSigningPhrase               = "Intel SGX TCB Signing"
+	tcbInfoTdxModuleIDPrefix       = "TDX_"
 )
 
 // Options represents verification options for a TDX attestation quote.
@@ -896,7 +897,7 @@ func isTdxTcbSvnHigherOrEqual(teeTcbSvn []byte, tdxTcbcomponents []pcs.TcbCompon
 
 func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIdentity, teeTcbSvn []byte) (*pcs.TcbLevel, error) {
 	tdxModuleVersion := []byte(teeTcbSvn[1:2])
-	tdxModuleIdentityID := "TDX_" + hex.EncodeToString(tdxModuleVersion)
+	tdxModuleIdentityID := tcbInfoTdxModuleIDPrefix + hex.EncodeToString(tdxModuleVersion)
 	tdxModuleIsvSvn := uint32(teeTcbSvn[0])
 
 	for _, tdxModuleIdentity := range tcbInfoTdxModuleIdentities {
