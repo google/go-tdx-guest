@@ -336,7 +336,7 @@ func populateConfig() error {
 			*dest = value
 		}
 	}
-	setRtmrs := func(dest *[][]byte, _, flag string) error {
+	setRtmrs := func(dest *[][]byte, flag string) error {
 		if flag != "" {
 			val, err := parseRtmrs(flag)
 			if err != nil {
@@ -361,7 +361,7 @@ func populateConfig() error {
 	return multierr.Combine(
 		setUint32(&policy.HeaderPolicy.MinimumQeSvn, "minimum_qe_svn", *minqesvn, defaultMinQeSvn),
 		setUint32(&policy.HeaderPolicy.MinimumPceSvn, "minimum_pce_svn", *minpcesvn, defaultMinPceSvn),
-		setRtmrs(&policy.TdQuoteBodyPolicy.Rtmrs, "rtmrs", *rtmrs),
+		setRtmrs(&policy.TdQuoteBodyPolicy.Rtmrs, *rtmrs),
 	)
 }
 

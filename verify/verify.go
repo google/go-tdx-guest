@@ -867,6 +867,9 @@ func verifyHash256(quote *pb.QuoteV4) error {
 }
 
 func isCPUSvnHigherOrEqual(pckCertCPUSvnComponents []byte, sgxTcbcomponents []pcs.TcbComponent) bool {
+	if len(pckCertCPUSvnComponents) != len(sgxTcbcomponents) {
+		return false
+	}
 	for i := range pckCertCPUSvnComponents {
 		if pckCertCPUSvnComponents[i] < sgxTcbcomponents[i].Svn {
 			return false
@@ -876,8 +879,11 @@ func isCPUSvnHigherOrEqual(pckCertCPUSvnComponents []byte, sgxTcbcomponents []pc
 }
 
 func isTdxTcbSvnHigherOrEqual(teeTcbSvn []byte, tdxTcbcomponents []pcs.TcbComponent) bool {
+	if len(teeTcbSvn) != len(tdxTcbcomponents) {
+		return false
+	}
 	start := 0
-	if teeTcbSvn[0] > 0 {
+	if teeTcbSvn[1] > 0 {
 		start = 2
 	}
 	for i := start; i < len(teeTcbSvn); i++ {
@@ -897,14 +903,14 @@ func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIden
 		if tdxModuleIdentityID == tdxModuleIdentity.ID {
 			for _, tcbLevel := range tdxModuleIdentity.TcbLevels {
 				if tdxModuleIsvSvn >= tcbLevel.Tcb.Isvsvn {
-					logger.V(2).Info("Matched to TDX Module Identity TCB Level with ISVSVN: ", tcbLevel.Tcb.Isvsvn)
+					logger.V(2).Info("TDX Module Identity's TCB Level matched the TDX Module's ISVSVN: ", tcbLevel.Tcb.Isvsvn)
 					return &tcbLevel, nil
 				}
 			}
-			return nil, fmt.Errorf("missing matching TDX Module Identity TCB Level (ISVSVN: %d)", tdxModuleIsvSvn)
+			return nil, fmt.Errorf("could not find a TDX Module Identity TCB Level matching the TDX Module's ISVSVN (%d)", tdxModuleIsvSvn)
 		}
 	}
-	return nil, fmt.Errorf("missing matching TDX Module Identity (%q) for given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
+	return nil, fmt.Errorf("could not find a TDX Module Identity (%q) matching the given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
 }
 
 func getMatchingTcbLevel(tcbLevels []pcs.TcbLevel, tdReport *pb.TDQuoteBody, pckCertPceSvn uint16, pckCertCPUSvnComponents []byte) (pcs.TcbLevel, error) {
