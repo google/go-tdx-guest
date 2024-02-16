@@ -656,25 +656,25 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 
 	setTcbSvnValues(10, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
 	wantErr := "no matching TCB level found"
-	if err := checkTcbInfoTcbStatus(tcbInfo.TcbLevels, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
 		t.Errorf("SgxTcbComponents values greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	setTcbSvnValues(0, 10, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
-	if err := checkTcbInfoTcbStatus(tcbInfo.TcbLevels, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
 		t.Errorf("TdxTcbComponents values greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 20
 	setTcbSvnValues(0, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
-	if err := checkTcbInfoTcbStatus(tcbInfo.TcbLevels, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
 		t.Errorf("PCESvn value greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 0
 	tcbInfo.TcbLevels[0].TcbStatus = "OutOfDate"
 	wantErr = `TCB Status is not "UpToDate", found "OutOfDate"`
-	if err := checkTcbInfoTcbStatus(tcbInfo.TcbLevels, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
 		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 }

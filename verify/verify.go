@@ -169,6 +169,7 @@ const (
 	tcbInfoID                      = "TDX"
 	qeIdentityID                   = "TD_QE"
 	tcbSigningPhrase               = "Intel SGX TCB Signing"
+	tcbInfoTdxModuleIDPrefix       = "TDX_"
 )
 
 // Options represents verification options for a TDX attestation quote.
@@ -866,20 +867,58 @@ func verifyHash256(quote *pb.QuoteV4) error {
 	return nil
 }
 
-func isSvnHigherOrEqual(svn []byte, components []pcs.TcbComponent) bool {
-	for i := range svn {
-		if svn[i] < components[i].Svn {
+func isCPUSvnHigherOrEqual(pckCertCPUSvnComponents []byte, sgxTcbcomponents []pcs.TcbComponent) bool {
+	if len(pckCertCPUSvnComponents) != len(sgxTcbcomponents) {
+		return false
+	}
+	for i := range pckCertCPUSvnComponents {
+		if pckCertCPUSvnComponents[i] < sgxTcbcomponents[i].Svn {
 			return false
 		}
 	}
 	return true
 }
 
+func isTdxTcbSvnHigherOrEqual(teeTcbSvn []byte, tdxTcbcomponents []pcs.TcbComponent) bool {
+	if len(teeTcbSvn) != len(tdxTcbcomponents) {
+		return false
+	}
+	start := 0
+	if teeTcbSvn[1] > 0 {
+		start = 2
+	}
+	for i := start; i < len(teeTcbSvn); i++ {
+		if teeTcbSvn[i] < tdxTcbcomponents[i].Svn {
+			return false
+		}
+	}
+	return true
+}
+
+func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIdentity, teeTcbSvn []byte) (*pcs.TcbLevel, error) {
+	tdxModuleVersion := []byte(teeTcbSvn[1:2])
+	tdxModuleIdentityID := tcbInfoTdxModuleIDPrefix + hex.EncodeToString(tdxModuleVersion)
+	tdxModuleIsvSvn := uint32(teeTcbSvn[0])
+
+	for _, tdxModuleIdentity := range tcbInfoTdxModuleIdentities {
+		if tdxModuleIdentityID == tdxModuleIdentity.ID {
+			for _, tcbLevel := range tdxModuleIdentity.TcbLevels {
+				if tdxModuleIsvSvn >= tcbLevel.Tcb.Isvsvn {
+					logger.V(2).Infof("TDX Module Identity's TCB Level's ISVSVN(%q) matched the TDX Module's ISVSVN(%q)", tcbLevel.Tcb.Isvsvn, tdxModuleIsvSvn)
+					return &tcbLevel, nil
+				}
+			}
+			return nil, fmt.Errorf("could not find a TDX Module Identity TCB Level matching the TDX Module's ISVSVN (%d)", tdxModuleIsvSvn)
+		}
+	}
+	return nil, fmt.Errorf("could not find a TDX Module Identity (%q) matching the given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
+}
+
 func getMatchingTcbLevel(tcbLevels []pcs.TcbLevel, tdReport *pb.TDQuoteBody, pckCertPceSvn uint16, pckCertCPUSvnComponents []byte) (pcs.TcbLevel, error) {
 	for _, tcbLevel := range tcbLevels {
-		if isSvnHigherOrEqual(pckCertCPUSvnComponents, tcbLevel.Tcb.SgxTcbcomponents) &&
+		if isCPUSvnHigherOrEqual(pckCertCPUSvnComponents, tcbLevel.Tcb.SgxTcbcomponents) &&
 			pckCertPceSvn >= tcbLevel.Tcb.Pcesvn &&
-			isSvnHigherOrEqual(tdReport.GetTeeTcbSvn(), tcbLevel.Tcb.TdxTcbcomponents) {
+			isTdxTcbSvnHigherOrEqual(tdReport.GetTeeTcbSvn(), tcbLevel.Tcb.TdxTcbcomponents) {
 			return tcbLevel, nil
 		}
 	}
@@ -898,15 +937,23 @@ func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) error {
 	return ErrTcbStatus
 }
 
-func checkTcbInfoTcbStatus(tcbLevels []pcs.TcbLevel, tdQuoteBody *pb.TDQuoteBody, pckCertExtensions *pcs.PckExtensions) error {
+func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pckCertExtensions *pcs.PckExtensions) error {
+	tcbLevels := tcbInfo.TcbLevels
 	matchingTcbLevel, err := getMatchingTcbLevel(tcbLevels, tdQuoteBody, pckCertExtensions.TCB.PCESvn, pckCertExtensions.TCB.CPUSvnComponents)
 	if err != nil {
 		return err
 	}
 	logger.V(2).Info("Matching TCB Level found: ", matchingTcbLevel)
 
-	if matchingTcbLevel.Tcb.TdxTcbcomponents[1].Svn != tdQuoteBody.GetTeeTcbSvn()[1] {
-		return fmt.Errorf("SVN at index 1(%v) in Tcb.TdxTcbcomponents is not equal to TD Quote Body's index 1(%v) TEE TCB svn value", matchingTcbLevel.Tcb.TdxTcbcomponents[1].Svn, tdQuoteBody.GetTeeTcbSvn()[1])
+	if tdQuoteBody.GetTeeTcbSvn()[1] > 0 {
+		matchingTdxModuleTcbLevel, err := getMatchingTdxModuleTcbLevel(tcbInfo.TdxModuleIdentities, tdQuoteBody.GetTeeTcbSvn())
+		if err != nil {
+			return err
+		}
+		logger.V(2).Info("Tdx Module TCB Status found: ", matchingTdxModuleTcbLevel.TcbStatus)
+		if matchingTdxModuleTcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
+			return fmt.Errorf("TDX Module TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTdxModuleTcbLevel.TcbStatus)
+		}
 	}
 
 	logger.V(2).Info("TCB Status found: ", matchingTcbLevel.TcbStatus)
@@ -942,7 +989,7 @@ func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteB
 		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	}
 
-	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo.TcbLevels, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
+	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
 		return fmt.Errorf("TDX TCB info reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
