@@ -904,7 +904,7 @@ func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIden
 		if tdxModuleIdentityID == tdxModuleIdentity.ID {
 			for _, tcbLevel := range tdxModuleIdentity.TcbLevels {
 				if tdxModuleIsvSvn >= tcbLevel.Tcb.Isvsvn {
-					logger.V(2).Info("TDX Module Identity's TCB Level matched the TDX Module's ISVSVN: ", tcbLevel.Tcb.Isvsvn)
+					logger.V(2).Infof("TDX Module Identity's TCB Level's ISVSVN(%q) matched the TDX Module's ISVSVN(%q)", tcbLevel.Tcb.Isvsvn, tdxModuleIsvSvn)
 					return &tcbLevel, nil
 				}
 			}
