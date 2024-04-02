@@ -10,6 +10,21 @@ nonce.
 The tool's output is the report in any specified format to either standard out
 or directly to a file.
 
+*Note*: For Ubuntu images, the `tdx_guest` module was moved to linux-modules-extra
+package in the 1016 and newer kernels. You should be able to install the module,
+and either manually load the module or reboot.
+
+To install the linux-modules-extra package, run:
+
+```console
+sudo apt-get install linux-modules-extra-gcp
+```
+
+To manually load the module, run:
+
+```console
+sudo modprobe tdx_guest
+```
 
 ## Usage
 
