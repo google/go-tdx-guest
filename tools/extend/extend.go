@@ -77,9 +77,9 @@ func main() {
 	if err != nil {
 		die(err)
 	}
-	err = extend.ExtendtoRtmr(*rtmr, crypto.SHA384, eventLog)
+	err = extend.ExtendEventLogRtmr(*rtmr, crypto.SHA384, eventLog)
 	if err != nil {
 		die(err)
 	}
-	logger.V(1).Info("Extend meansurement into rtmr registers successfully")
+	logger.V(1).Infof("Extended measurement into rtmr %d successfully", *rtmr)
 }

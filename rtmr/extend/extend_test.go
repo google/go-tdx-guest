@@ -34,7 +34,7 @@ func (r *RtmtFakeSubsystem) RemoveAll(name string) error {
 		return fmt.Errorf("RemoveAll: Error %v", err)
 	}
 	if p.Attribute != "" || p.Entry == "" || p.Subsystem != RtmrSubsystem {
-		return fmt.Errorf("RemoveAll: expected RTMR subsystem. Subsystem: %q Entry %q Attribute %q", p.Subsystem, p.Entry, p.Attribute)
+		return fmt.Errorf("RemoveAll: expected rtmr subsystem. Subsystem: %q Entry %q Attribute %q", p.Subsystem, p.Entry, p.Attribute)
 	}
 	return nil
 }
@@ -70,13 +70,13 @@ func (c *RtmtFakeSubsystem) WriteFile(name string, content []byte) error {
 		return fmt.Errorf("WriteFile: %v", err)
 	}
 	if p.Entry == "" || p.Subsystem != RtmrSubsystem {
-		return fmt.Errorf("WriteFile(%q) expected RTMR subsystem entry path", name)
+		return fmt.Errorf("WriteFile(%q) expected rtmr subsystem entry path", name)
 	}
 	if p.Attribute == TsmRtmrDigest {
-		if c.RtmrIndex < 0 || c.RtmrIndex > 3 {
-			return fmt.Errorf("WriteFile(%q) invalid RTMR index %d. Index can only be 0-3", name, c.RtmrIndex)
+		if c.RtmrIndex != 2 && c.RtmrIndex != 3 {
+			return fmt.Errorf("invalid rtmr index %d. Index can only be 2 or 3", c.RtmrIndex)
 		}
-		if len(content) != int(crypto.SHA384.Size()) {
+		if len(content) > int(crypto.SHA384.Size()) {
 			return fmt.Errorf("WriteFile(%q) expected %d bytes, got %d", name, crypto.SHA384.Size(), len(content))
 		}
 		return nil
@@ -87,16 +87,16 @@ func (c *RtmtFakeSubsystem) WriteFile(name string, content []byte) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("WriteFile(%q) expected RTMR attribute entry path", p.Attribute)
+	return fmt.Errorf("WriteFile(%q) expected rtmr attribute entry path", p.Attribute)
 }
 
 func makeFakeRTMRClient() configfsi.Client {
 	return &RtmtFakeSubsystem{}
 }
 
-func TestExtendtoRtmr(t *testing.T) {
+func TestExtendEventLogRtmr(t *testing.T) {
 	client := makeFakeRTMRClient()
-	err := ExtendtoRtmrClient(client, 2, crypto.SHA384, []byte("hash"))
+	err := ExtendEventLogRtmrClient(client, 2, crypto.SHA384, []byte("hash"))
 	if err != nil {
 		t.Errorf("ExtendtoRtmrClient failed: %v", err)
 	}
@@ -105,23 +105,51 @@ func TestExtendtoRtmr(t *testing.T) {
 	}
 }
 
-func TestExtendtoRtmrErr(t *testing.T) {
+func TestExtendDigestRtmr(t *testing.T) {
+	client := makeFakeRTMRClient()
+	err := ExtendDigestRtmr(client, 2, []byte("hash"))
+	if err != nil {
+		t.Errorf("ExtendtoRtmrClient failed: %v", err)
+	}
+	if client.(*RtmtFakeSubsystem).RtmrIndex != 2 {
+		t.Errorf("ExtendtoRtmrClient failed: expected index 2, got %d", client.(*RtmtFakeSubsystem).RtmrIndex)
+	}
+}
+
+func TestExtendEventLogRtmrErr(t *testing.T) {
 	tcs := []struct {
 		rtmr     int
 		crypto   crypto.Hash
 		eventlog []byte
 		wantErr  string
 	}{
-		{rtmr: 5, crypto: crypto.SHA384, eventlog: []byte("event log"), wantErr: "invalid RTMR index 5. Index can only be 0-3"},
 		{rtmr: 2, crypto: crypto.SHA256, eventlog: []byte("event log"), wantErr: "unsupported hash algorithm SHA-256"},
-		{rtmr: 1, crypto: crypto.SHA384, eventlog: []byte("event log"), wantErr: "invalid  index 1, userspace can only extend to rtmr2 or rtmr3"},
+		{rtmr: 1, crypto: crypto.SHA384, eventlog: []byte("event log"), wantErr: "could not write digest to rmtr1: invalid rtmr index 1. Index can only be 2 or 3"},
 		{rtmr: 3, crypto: crypto.SHA384, eventlog: []byte(""), wantErr: "input event log is empty"},
 	}
 	client := makeFakeRTMRClient()
 	for _, tc := range tcs {
-		err := ExtendtoRtmrClient(client, tc.rtmr, tc.crypto, tc.eventlog)
+		err := ExtendEventLogRtmrClient(client, tc.rtmr, tc.crypto, tc.eventlog)
 		if err == nil || err.Error() != tc.wantErr {
 			t.Fatalf("ExtendtoRtmrClient(%d, %v, %q) failed: %v, want %q", tc.rtmr, tc.crypto, tc.eventlog, err, tc.wantErr)
+		}
+	}
+}
+
+func TestExtendDigestRtmrErr(t *testing.T) {
+	tcs := []struct {
+		rtmr    int
+		digest  []byte
+		wantErr string
+	}{
+		{rtmr: 1, digest: []byte("digest"), wantErr: "could not write digest to rmtr1: invalid rtmr index 1. Index can only be 2 or 3"},
+		{rtmr: 3, digest: []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"), wantErr: "digest is too long. The maximum length is 48 bytes"},
+	}
+	client := makeFakeRTMRClient()
+	for _, tc := range tcs {
+		err := ExtendDigestRtmr(client, tc.rtmr, tc.digest)
+		if err == nil || err.Error() != tc.wantErr {
+			t.Fatalf("ExtendtoRtmrClient(%d, %q) failed: %v, want %q", tc.rtmr, tc.digest, err, tc.wantErr)
 		}
 	}
 }

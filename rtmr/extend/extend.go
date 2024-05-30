@@ -17,7 +17,7 @@ package extend
 import (
 	"bytes"
 	"crypto"
-	"crypto/sha512" // Registrer SHA384 and SHA512
+	_ "crypto/sha512" // Registrer SHA384 and SHA512
 	"fmt"
 	"os"
 	"path/filepath"
@@ -54,34 +54,34 @@ func (r *RtmrExtend) attribute(subtree string) string {
 	return a.String()
 }
 
-// ExtendDigest extends the measurement to the rtmr with the given hash.
-func (r *RtmrExtend) ExtendDigest(hash []byte) error {
-	if (r.RtmrIndex != 2) && (r.RtmrIndex != 3) {
-		return fmt.Errorf("invalid rtmr index %d, userspace can only extend to rtmr2 or rtmr3", r.RtmrIndex)
-	}
+// extendDigest extends the measurement to the rtmr with the given hash.
+func (r *RtmrExtend) extendDigest(hash []byte) error {
 	if err := r.client.WriteFile(r.attribute(TsmRtmrDigest), hash); err != nil {
-		return fmt.Errorf("could not write report %s: %v", TsmPathIndex, err)
+		if (r.RtmrIndex == 2) || (r.RtmrIndex == 3) {
+			return fmt.Errorf("could not write digest to rmtr%d: %v. Is your rtmr index extendable from userspace?", r.RtmrIndex, err)
+		}
+		return fmt.Errorf("could not write digest to rmtr%d: %v", r.RtmrIndex, err)
 	}
 	return nil
 }
 
-// SetRtmrIndex sets a configfs rtmr entry to the given index.
+// setRtmrIndex sets a configfs rtmr entry to the given index.
 // It reports an error if the index cannot be written or the rtmr_tcg map does not match.
-func (r *RtmrExtend) SetRtmrIndex() error {
+func (r *RtmrExtend) setRtmrIndex() error {
 	indexBytes := []byte(strconv.Itoa(r.RtmrIndex)) // Convert index to []byte
 	indexPath := r.attribute(TsmPathIndex)
 	if err := r.client.WriteFile(indexPath, indexBytes); err != nil {
 		return fmt.Errorf("could not write index %s: %v", indexPath, err)
 	}
-	if err := r.ValidateRtmrIndex(); err != nil {
+	if err := r.validateRtmrIndex(); err != nil {
 		return fmt.Errorf("the tcg_map is invalid %s: %v", indexPath, err)
 	}
 	return nil
 }
 
-// ValidateRtmrIndex checks if the rtmr to PCR map is valid.
+// validateRtmrIndex checks if the rtmr to PCR map is valid.
 // It returns an error if the rtmr_tcg map does not match the expected value.
-func (r *RtmrExtend) ValidateRtmrIndex() error {
+func (r *RtmrExtend) validateRtmrIndex() error {
 	if (r.client == nil) || (r.entry == nil) {
 		return fmt.Errorf("RtmrExtend is not initialized")
 	}
@@ -98,7 +98,7 @@ func (r *RtmrExtend) ValidateRtmrIndex() error {
 
 	inputMap := convertCstring(data)
 	if inputMap != rtmrPcrMaps[r.RtmrIndex] {
-		return fmt.Errorf("tcg map error. expect:%s get:%s", rtmrPcrMaps[r.RtmrIndex], string(data))
+		return fmt.Errorf("rtmr %d tcg map is %q, expect %q", r.RtmrIndex, rtmrPcrMaps[r.RtmrIndex], string(data))
 	}
 	return nil
 }
@@ -121,7 +121,7 @@ func SearchRtmrInterface(client configfsi.Client, index int) (*RtmrExtend, error
 				entry:     &configfsi.TsmPath{Subsystem: RtmrSubsystem, Entry: p.Entry},
 				client:    client,
 			}
-			if r.ValidateRtmrIndex() == nil {
+			if r.validateRtmrIndex() == nil {
 				out = r
 				return nil
 			}
@@ -132,7 +132,7 @@ func SearchRtmrInterface(client configfsi.Client, index int) (*RtmrExtend, error
 	if err != nil {
 		return nil, err
 	}
-	if out.ValidateRtmrIndex() != nil {
+	if out.validateRtmrIndex() != nil {
 		return nil, fmt.Errorf("could not find rtmr entry in configfs: %v", err)
 	}
 
@@ -153,24 +153,20 @@ func CreateRtmrInterface(client configfsi.Client, index int) (r *RtmrExtend, err
 		client:    client,
 	}
 
-	if err := r.SetRtmrIndex(); err != nil {
+	if err := r.setRtmrIndex(); err != nil {
 		return nil, fmt.Errorf("could not set rtmr index %d: %v", index, err)
 	}
 	return r, nil
 }
 
-// ExtendtoRtmrClient extends the measurement to the rtmr with the given client.
-func ExtendtoRtmrClient(client configfsi.Client, rtmr int, hashAlgo crypto.Hash, content []byte) error {
-	if hashAlgo != crypto.SHA384 {
-		return fmt.Errorf("unsupported hash algorithm %v", hashAlgo)
-	}
-	if len(content) == 0 {
-		return fmt.Errorf("input event log is empty")
+// ExtendDigestRtmr extends the measurement to the rtmr with the given digest.
+func ExtendDigestRtmr(client configfsi.Client, rtmr int, digest []byte) error {
+	if len(digest) > crypto.SHA384.Size() {
+		return fmt.Errorf("digest is too long. The maximum length is %d bytes", crypto.SHA384.Size())
 	}
 	if rtmr < 0 || rtmr > 3 {
 		return fmt.Errorf("invalid rtmr index %d. Index can only be 0-3", rtmr)
 	}
-
 	r, err := SearchRtmrInterface(client, rtmr)
 	if err != nil {
 		logger.V(2).Infof("Could not find rtmr entry in configfs. error: %v", err)
@@ -182,18 +178,28 @@ func ExtendtoRtmrClient(client configfsi.Client, rtmr int, hashAlgo crypto.Hash,
 	} else {
 		logger.V(1).Info("Found existing rtmr entry in configfs.")
 	}
-
-	hash := sha512.Sum384(content)
-	err = r.ExtendDigest(hash[:])
-	return err
+	return r.extendDigest(digest)
 }
 
-// ExtendtoRtmr extends the measurement to the rtmr with the given hash algorithm and content.
-func ExtendtoRtmr(rtmr int, hashAlgo crypto.Hash, content []byte) error {
-	var err error
+// ExtendEventLogRtmrClient extends the measurement to the rtmr with the given client.
+func ExtendEventLogRtmrClient(client configfsi.Client, rtmr int, hashAlgo crypto.Hash, content []byte) error {
+	if hashAlgo != crypto.SHA384 {
+		return fmt.Errorf("unsupported hash algorithm %v", hashAlgo)
+	}
+	if len(content) == 0 {
+		return fmt.Errorf("input event log is empty")
+	}
+	sha384 := hashAlgo.New()
+	sha384.Write(content)
+	hash := sha384.Sum(nil)
+	return ExtendDigestRtmr(client, rtmr, hash)
+}
+
+// ExtendEventLogRtmr extends the measurement into the rtmr with the given hash algorithm and content.
+func ExtendEventLogRtmr(rtmr int, hashAlgo crypto.Hash, content []byte) error {
 	client, err := linuxtsm.MakeClient()
 	if err != nil {
 		return err
 	}
-	return ExtendtoRtmrClient(client, rtmr, hashAlgo, content)
+	return ExtendEventLogRtmrClient(client, rtmr, hashAlgo, content)
 }
