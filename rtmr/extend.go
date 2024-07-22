@@ -18,7 +18,7 @@ package rtmr
 
 import (
 	"crypto"
-	_ "crypto/sha512" // Registrer SHA384 and SHA512
+	_ "crypto/sha512" // Register SHA384 and SHA512
 	"fmt"
 
 	"github.com/google/go-configfs-tsm/configfs/configfsi"
