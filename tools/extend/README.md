@@ -17,11 +17,15 @@ The tool's output is an error or "Success".
 
 This flag provides the path to the event log to measure. Stdin is "-".
 
-### `quiet`
+### `-rtmr`
+
+This flag defines the RTMR index that will be extended. As specified in the Intel TDX specification, user space applications can only extend to RTMR2 or RTMR3.
+
+### `-quiet`
 
 If set, doesn't write exit errors to Stdout. All results are communicated through exit code.
 
-### `verbosity`
+### `-verbosity`
 
 Used to set the verbosity of logger, where higher number means more verbose output.
 
@@ -29,7 +33,7 @@ Default value is `0`.
 
 ## Examples
 
-The following example measures an eventlog and extends it measurement into the RTMR2
+The following example measures an event log and extends its measurement into the RTMR2
 register.
 
 ```shell
