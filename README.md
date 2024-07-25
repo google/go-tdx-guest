@@ -110,12 +110,12 @@ This type contains five fields:
 
 ## `rtmr`
 
-This library should be used within the confidential workload to performs a hash 
+This library should be used within the confidential workload to perform a hash 
 extend operation into the TDX RTMR register.
 
 ### `func ExtendEventLog(rtmrIndex int, hashAlgo crypto.Hash, eventLog []byte) error`
 
-This function calculates the hash digest of a provided event log and extend it 
+This function calculates the hash digest of a provided event log and extends it 
 in the corresponding RTMR register. However, it's important to note that TDX 
 currently only supports the SHA-384 hash algorithm. If `hashAlgo` is not SHA-384, 
 the function will return an error.
