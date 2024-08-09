@@ -209,6 +209,25 @@ func TestTdxQuote(t *testing.T) {
 			wantErr: "quote field MR_TD",
 		},
 		{
+			name:  "Test incorrect MR_TD of all incorrect",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{make([]byte, abi.MrTdSize), make([]byte, abi.MrTdSize)},
+				},
+			},
+			wantErr: "no value in AnyMrTd matched",
+		},
+		{
+			name:  "Test correct MR_TD of many incorrect",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{make([]byte, abi.MrTdSize), make([]byte, abi.MrTdSize), mrTd},
+				},
+			},
+		},
+		{
 			name:  "Test incorrect MR_CONFIG_ID",
 			quote: quote12345,
 			opts: &Options{
