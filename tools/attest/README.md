@@ -17,7 +17,7 @@ and either manually load the module or reboot.
 To install the linux-modules-extra package, run:
 
 ```console
-sudo apt-get install linux-modules-extra-gcp
+sudo apt-get install linux-modules-extra-$(uname -r)
 ```
 
 To manually load the module, run:
