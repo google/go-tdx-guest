@@ -1,6 +1,6 @@
 module github.com/google/go-tdx-guest
 
-go 1.19
+go 1.20
 
 require (
 	github.com/google/go-cmp v0.6.0
@@ -14,7 +14,4 @@ require (
 	google.golang.org/protobuf v1.34.2
 )
 
-require (
-	github.com/google/go-tpm v0.9.0 // indirect
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 // indirect
-)
+require github.com/google/go-tpm v0.9.0 // indirect
