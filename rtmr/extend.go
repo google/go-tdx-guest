@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package rtmr provides the library functions to extend and read TDX rtmr
-// registers and their tcg maps.
+// Package rtmr provides the library functions:
+// 1. extend and read TDX rtmr registers and their tcg maps.
+// 2. replay the event log with the TDX quote.
 package rtmr
 
 import (
