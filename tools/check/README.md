@@ -27,17 +27,17 @@ The format that input takes. One of
 
 Default value is `bin`.
 
-### `quiet`
+### `-quiet`
 
 If set, doesn't write exit errors to Stdout. All results are communicated through exit code.
 
-### `verbosity`
+### `-verbosity`
 
 Used to set the verbosity of logger, where higher number means more verbose output.
 
 Default value is `0`.
 
-### `check_crl`
+### `-check_crl`
 
 Checks if the PCK certificate and the intermediate certificate of the PCK
 certificate chain has been revoked, and errors if so. Default `false`. Requires
@@ -45,7 +45,7 @@ certificate chain has been revoked, and errors if so. Default `false`. Requires
 
 Note: For more details about PCK CRLs refer [Intel's PCK CRL specification](https://api.trustedservices.intel.com/documents/Intel_SGX_PCK_Certificate_CRL_Spec-1.5.pdf)
 
-### `get_collateral`
+### `-get_collateral`
 
 Uses the network to download "collateral" elements:
 

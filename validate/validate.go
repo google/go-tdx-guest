@@ -84,6 +84,8 @@ type TdQuoteBodyOptions struct {
 	Rtmrs [][]byte
 	// ReportData is the expected REPORT_DATA field. Must be nil or 64 bytes long. Not checked if nil.
 	ReportData []byte
+	// MrTd is any permitted MR_TD field. Must be nil or each entry 48 bytes long. Not checked if nil.
+	AnyMrTd [][]byte
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -93,12 +95,14 @@ func lengthCheck(name string, length int, value []byte) error {
 	return nil
 }
 
-func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
+func lengthCheckMany(name string, constraint func(int) error, length int, value [][]byte) error {
 	if len(value) == 0 {
 		return nil
 	}
-	if len(value) != size {
-		return fmt.Errorf("option %q size is %d. Want %d", name, len(value), size)
+	if constraint != nil {
+		if err := constraint(len(value)); err != nil {
+			return err
+		}
 	}
 
 	for i := range value {
@@ -110,6 +114,12 @@ func lengthCheckRtmr(name string, size int, length int, value [][]byte) error {
 }
 
 func checkOptionsLengths(opts *Options) error {
+	eqConstraint := func(size int) error {
+		if size != rtmrsCount {
+			return fmt.Errorf("option 'rtmrs' size is %d. Want %d", size, rtmrsCount)
+		}
+		return nil
+	}
 	return multierr.Combine(
 		lengthCheck("mr_seam", abi.MrSeamSize, opts.TdQuoteBodyOptions.MrSeam),
 		lengthCheck("td_attributes", abi.TdAttributesSize, opts.TdQuoteBodyOptions.TdAttributes),
@@ -120,7 +130,8 @@ func checkOptionsLengths(opts *Options) error {
 		lengthCheck("mr_owner_config", abi.MrOwnerConfigSize, opts.TdQuoteBodyOptions.MrOwnerConfig),
 		lengthCheck("report_data", abi.ReportDataSize, opts.TdQuoteBodyOptions.ReportData),
 		lengthCheck("qe_vendor_id", abi.QeVendorIDSize, opts.HeaderOptions.QeVendorID),
-		lengthCheckRtmr("rtmrs", rtmrsCount, abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs),
+		lengthCheckMany("rtmrs", eqConstraint, abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs),
+		lengthCheckMany("any_mr_td", nil, abi.MrTdSize, opts.TdQuoteBodyOptions.AnyMrTd),
 	)
 }
 
@@ -149,6 +160,7 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			MrOwnerConfig:    policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
 			Rtmrs:            policy.GetTdQuoteBodyPolicy().GetRtmrs(),
 			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
+			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
 		},
 	}
 	if err := checkOptionsLengths(opts); err != nil {
@@ -165,24 +177,25 @@ func byteCheckRtmr(size int, given, required [][]byte) error {
 	if len(required) != rtmrsCount {
 		return fmt.Errorf("RTMR field size(%d) is not equal to expected size(4)", len(required))
 	}
-	for i := range required {
-		if len(required[i]) == 0 {
-			logger.V(1).Infof("Skipping validation check for RTMR[%d] field: input provided is nil", i+1)
-			continue
+	for i, bs := range required {
+		if err := byteCheck("Rtmrs", fmt.Sprintf("RTMR[%d]", i+1), size, given[i], bs); err != nil {
+			return err
 		}
-		if len(required[i]) != size {
-			return fmt.Errorf("RTMR[%d] should be 48 bytes, found %d", i, len(required[i]))
-		}
-
-		logger.V(2).Infof("Quote field RTMR[%d] value is %s, and expected value is %s", i+1, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
-		if !bytes.Equal(required[i], given[i]) {
-			return fmt.Errorf("quote field RTMR[%d] is %s. Expect %s",
-				i, hex.EncodeToString(given[i]), hex.EncodeToString(required[i]))
-		}
-
-		logger.V(1).Infof("Successfully validated RTMR[%d] field", i+1)
 	}
 	return nil
+}
+
+func byteCheckAny(size int, given []byte, allowed [][]byte) error {
+	if len(allowed) == 0 {
+		logger.V(1).Info("Skipping validation check for MRTD field: input provided is nil")
+		return nil
+	}
+	for i, bs := range allowed {
+		if err := byteCheck("MrTd", fmt.Sprintf("AnyMrTd[%d]", i), size, given, bs); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("no value in AnyMrTd matched %s", hex.EncodeToString(given))
 }
 
 func byteCheck(option, field string, size int, given, required []byte) error {
@@ -215,6 +228,7 @@ func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
 		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, quote.GetTdQuoteBody().GetMrOwner(), opts.TdQuoteBodyOptions.MrOwner),
 		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, quote.GetTdQuoteBody().GetMrOwnerConfig(), opts.TdQuoteBodyOptions.MrOwnerConfig),
 		byteCheckRtmr(abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
+		byteCheckAny(abi.MrTdSize, quote.GetTdQuoteBody().GetMrTd(), opts.TdQuoteBodyOptions.AnyMrTd),
 		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, quote.GetTdQuoteBody().GetReportData(), opts.TdQuoteBodyOptions.ReportData),
 		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, quote.GetHeader().GetQeVendorId(), opts.HeaderOptions.QeVendorID),
 	)

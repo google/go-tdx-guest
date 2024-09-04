@@ -51,6 +51,7 @@ message TDQuoteBodyPolicy {
   bytes mr_owner_config = 8;      // should be 48 bytes
   repeated bytes rtmrs = 9;       // should be 48 * rtmrsCount
   bytes report_data = 10;         // should be 64 bytes
+  repeated bytes any_mr_td = 11;  // each should be 48 bytes.
 }
 
 // RootOfTrust represents configuration for which hardware root of trust

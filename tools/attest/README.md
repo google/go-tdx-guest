@@ -10,6 +10,21 @@ nonce.
 The tool's output is the report in any specified format to either standard out
 or directly to a file.
 
+*Note*: For Ubuntu images, the `tdx_guest` module was moved to linux-modules-extra
+package in the 1016 and newer kernels. You should be able to install the module,
+and either manually load the module or reboot.
+
+To install the linux-modules-extra package, run:
+
+```console
+sudo apt-get install linux-modules-extra-$(uname -r)
+```
+
+To manually load the module, run:
+
+```console
+sudo modprobe tdx_guest
+```
 
 ## Usage
 
@@ -48,13 +63,13 @@ Path to output file to write attestation report to.
 Default is empty, interpreted as stdout.
 
 
-### `verbose`
+### `-verbose`
 
 If set, then the logger can append INFO and WARNING logs to stdout as per the verbosity level. Default logger has verbosity set to `0`, so verbosity option should be set to appropriate value to append INFO and WARN logs at variable verbosity levels to stdout.
 
 Default value is `false`.
 
-### `verbosity`
+### `-verbosity`
 
 Used to set the verbosity of logger, where higher number means more verbose output.
 
