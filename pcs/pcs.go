@@ -57,6 +57,8 @@ var (
 	OidPCEID = asn1.ObjectIdentifier([]int{1, 2, 840, 113741, 1, 13, 1, 3})
 	// OidFMSPC  is the x509v3 extension for PCK certificate's SGX Extensions FMSPC value.
 	OidFMSPC = asn1.ObjectIdentifier([]int{1, 2, 840, 113741, 1, 13, 1, 4})
+	// OidSGXType is the x509v3 extension for PCK certificate's SGX Extensions SGX Type value.
+	OidSGXType = asn1.ObjectIdentifier([]int{1, 2, 840, 113741, 1, 13, 1, 5})
 
 	// ErrPckExtInvalid error returned when parsing PCK certificate's extension returns leftover bytes
 	ErrPckExtInvalid = errors.New("unexpected leftover bytes for PCK certificate's extension")
@@ -158,13 +160,26 @@ type PckCertTCB struct {
 }
 
 // PckExtensions represents the information stored in the x509 extensions of a PCK certificate which
-// will be required for verification
+// will be required for verification/validation
 type PckExtensions struct {
-	PPID  string
-	TCB   PckCertTCB
-	PCEID string
-	FMSPC string
+	PPID    string
+	TCB     PckCertTCB
+	PCEID   string
+	FMSPC   string
+	SGXType SGXType
 }
+
+// SGXType represents the type of the platform for which the PCK certificate was created
+type SGXType int
+
+const (
+	// SGXTypeStandard represents a standard (non-scalable) platform.
+	SGXTypeStandard SGXType = iota
+	// SGXTypeScalable represents a scalable platform with logical integrity protection.
+	SGXTypeScalable
+	// SGXTypeScalable represents a scalable platform with cryptographic integrity protection.
+	SGXTypeScalableWithIntegrity
+)
 
 // HexBytes struct contains hex decoded string to bytes value
 type HexBytes struct {
@@ -376,6 +391,15 @@ func extractAsn1OctetStringExtension(name string, extension asn1.RawValue, size 
 	return hex.EncodeToString(val), nil
 }
 
+// attributeTypeAndEnumerated is a specialized version of
+// pkix.AttributeTypeAndValue to work around a bug where Go's ASN.1 parser
+// fails to unmarshal `asn1.Enumerated` values into the `any` field in
+// `AttributeTypeAndValue`: https://github.com/golang/go/pull/69727
+type attributeTypeAndEnumerated struct {
+	Type  asn1.ObjectIdentifier
+	Value asn1.Enumerated
+}
+
 func extractSgxExtensions(extensions []asn1.RawValue) (*PckExtensions, error) {
 	pckExtension := &PckExtensions{}
 	if len(extensions) < sgxExtensionMinSize {
@@ -416,6 +440,14 @@ func extractSgxExtensions(extensions []asn1.RawValue) (*PckExtensions, error) {
 				return nil, err
 			}
 		}
+		if sExtension.Type.Equal(OidSGXType) {
+			var sExtension attributeTypeAndEnumerated
+			_, err := asn1.Unmarshal(ext.FullBytes, &sExtension)
+			if err != nil {
+				return nil, fmt.Errorf("could not parse SGX extension's in PCK certificate: %v", err)
+			}
+			pckExtension.SGXType = SGXType(sExtension.Value)
+		}
 	}
 	return pckExtension, nil
 }
@@ -430,7 +462,7 @@ func findMatchingExtension(extns []pkix.Extension, oid asn1.ObjectIdentifier) (*
 }
 
 // PckCertificateExtensions returns only those x509v3 extensions from the PCK certificate into a
-// struct type which will be required in verification purpose.
+// struct type which will be required for verification or validation purposes.
 func PckCertificateExtensions(cert *x509.Certificate) (*PckExtensions, error) {
 	if len(cert.Extensions) != pckCertExtensionSize {
 		return nil, fmt.Errorf("PCK certificate extensions length found %d. Expected %d", len(cert.Extensions), pckCertExtensionSize)
