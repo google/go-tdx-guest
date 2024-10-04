@@ -110,7 +110,7 @@ var (
 	// Assign the values of the flags to the corresponding proto fields
 	config = &ccpb.Config{
 		RootOfTrust: &ccpb.RootOfTrust{},
-		Policy:      &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}},
+		Policy:      &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}},
 	}
 )
 
