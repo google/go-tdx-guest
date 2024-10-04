@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-tdx-guest/pcs"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
 
@@ -73,6 +74,7 @@ func TestTdxQuote(t *testing.T) {
 		0x59, 0x44, 0xde, 0xa4, 0x7c, 0xae, 0xf1, 0xf9, 0x80, 0x86, 0x39, 0x93, 0xd9, 0x89, 0x95, 0x45,
 		0xeb, 0x74, 0x6, 0xa3, 0x8d, 0x1e, 0xed, 0x31, 0x3b, 0x98, 0x7a, 0x46, 0x7d, 0xac, 0xea, 0xd6,
 		0xf0, 0xc8, 0x7a, 0x6d, 0x76, 0x6c, 0x66, 0xf6, 0xf2, 0x9f, 0x8a, 0xcb, 0x28, 0x1f, 0x11, 0x13}
+	sgxType := pcs.SGXTypeScalable
 
 	mknonce := func(front []byte) []byte {
 		result := make([]byte, 64)
@@ -135,6 +137,9 @@ func TestTdxQuote(t *testing.T) {
 					MrOwnerConfig:    mrOwnerConfig,
 					Rtmrs:            [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
 					ReportData:       reportData,
+				},
+				PCKOptions: PCKOptions{
+					SgxType: &sgxType,
 				},
 			},
 		},
@@ -281,7 +286,16 @@ func TestTdxQuote(t *testing.T) {
 			opts: &Options{
 				HeaderOptions: HeaderOptions{QeVendorID: make([]byte, abi.QeVendorIDSize)},
 			},
-			wantErr: "quote field QE_VENDOR_ID"},
+			wantErr: "quote field QE_VENDOR_ID",
+		},
+		{
+			name:  "Test incorrect SGXType",
+			quote: quote12345,
+			opts: &Options{
+				PCKOptions: PCKOptions{SgxType: new(pcs.SGXType)},
+			},
+			wantErr: "PCK extension SGXType",
+		},
 	}
 
 	for _, tc := range tests {
