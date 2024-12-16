@@ -21,7 +21,7 @@ import (
 	"fmt"
 
 	"github.com/google/go-eventlog/ccel"
-	"github.com/google/go-eventlog/common"
+	"github.com/google/go-eventlog/extract"
 	"github.com/google/go-eventlog/proto/state"
 	"github.com/google/go-eventlog/register"
 	"github.com/google/go-tdx-guest/abi"
@@ -34,7 +34,7 @@ import (
 type ParseTdxCcelOpts struct {
 	Validation   *validate.Options
 	Verification *verify.Options
-	ExtractOpt   *ccel.ExtractOpts
+	ExtractOpt   *extract.Opts
 }
 
 func getRtmrsFromTdQuoteV4(quote *tdxpb.QuoteV4) (*register.RTMRBank, error) {
@@ -78,7 +78,7 @@ func TdxDefaultOpts(tdxNonce []byte) ParseTdxCcelOpts {
 	return ParseTdxCcelOpts{
 		Validation:   policy,
 		Verification: verify.DefaultOptions(),
-		ExtractOpt:   &ccel.ExtractOpts{Loader: common.GRUB},
+		ExtractOpt:   &extract.Opts{Loader: extract.GRUB},
 	}
 }
 
@@ -103,5 +103,5 @@ func ParseCcelWithTdQuote(ccelBytes []byte, tableBytes []byte, tdxAttestationQuo
 		return nil, err
 	}
 	// Parse the event log and replay the event log with the RTMR values.
-	return ccel.ExtractFirmwareLogState(tableBytes, ccelBytes, *rtmrBank, *opts.ExtractOpt)
+	return ccel.ReplayAndExtract(tableBytes, ccelBytes, *rtmrBank, *opts.ExtractOpt)
 }
