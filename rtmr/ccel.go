@@ -34,7 +34,7 @@ import (
 type ParseTdxCcelOpts struct {
 	Validation   *validate.Options
 	Verification *verify.Options
-	ExtractOpt   *extract.Opts
+	ExtractOpt   extract.Opts
 }
 
 func getRtmrsFromTdQuoteV4(quote *tdxpb.QuoteV4) (*register.RTMRBank, error) {
@@ -78,7 +78,7 @@ func TdxDefaultOpts(tdxNonce []byte) ParseTdxCcelOpts {
 	return ParseTdxCcelOpts{
 		Validation:   policy,
 		Verification: verify.DefaultOptions(),
-		ExtractOpt:   &extract.Opts{Loader: extract.GRUB},
+		ExtractOpt:   extract.Opts{Loader: extract.GRUB},
 	}
 }
 
@@ -103,5 +103,5 @@ func ParseCcelWithTdQuote(ccelBytes []byte, tableBytes []byte, tdxAttestationQuo
 		return nil, err
 	}
 	// Parse the event log and replay the event log with the RTMR values.
-	return ccel.ReplayAndExtract(tableBytes, ccelBytes, *rtmrBank, *opts.ExtractOpt)
+	return ccel.ReplayAndExtract(tableBytes, ccelBytes, *rtmrBank, opts.ExtractOpt)
 }
