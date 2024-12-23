@@ -91,6 +91,8 @@ var (
 	ErrTcbInfoNil = errors.New("tcbInfo is empty in collaterals")
 	// ErrQeIdentityNil error returned when QeIdentity response structure is missing
 	ErrQeIdentityNil = errors.New("QeIdentity is empty in collaterals")
+	// ErrMissingPckExt error returned when pckCertExtensions is missing
+	ErrMissingPckExt = errors.New("missing PCK certificate's extension from SGX PCK Certificate")
 	// ErrMissingPCKCrlSigningCert error returned when signing certificate is missing in issuer chain of PCK CRL
 	ErrMissingPCKCrlSigningCert = errors.New("missing signing certificate in the issuer chain of PCK CRL")
 	// ErrMissingPCKCrlRootCert error returned when root certificate is missing in issuer chain of PCK CRL
@@ -139,8 +141,10 @@ var (
 	ErrRootCaCertExpired = errors.New("root CA certificate in PCK certificate chain has expired")
 	// ErrIntermediateCaCertExpired error returned when Intermediate CA certificate has expired
 	ErrIntermediateCaCertExpired = errors.New("intermediate CA certificate in PCK certificate chain has expired")
-	// ErrTcbStatus error returned when TCB status is out of date
-	ErrTcbStatus = errors.New("unable to find latest status of TCB, it is now OutOfDate")
+	// ErrTdxTcbStatus error returned when TDX TCB status is out of date
+	ErrTdxTcbStatus = errors.New("unable to find latest status of TDX TCB, it is now OutOfDate")
+	// ErrEnclaveTcbStatus error returned when Enclave TCB status is out of date
+	ErrEnclaveTcbStatus = errors.New("unable to find latest status of Enclave TCB, it is now OutOfDate")
 	// ErrCertNil error returned when certificate is not provided
 	ErrCertNil = errors.New("certificate is nil")
 	// ErrParentCertNil error returned when parent certificate is not provided
@@ -895,6 +899,13 @@ func isTdxTcbSvnHigherOrEqual(teeTcbSvn []byte, tdxTcbcomponents []pcs.TcbCompon
 	return true
 }
 
+// getMatchingTdxModuleTcbLevel performs additional TCB status evaluation for TDX module in case TEE TCB SVN at index 1 is greater or equal to 1.
+// It performs the following comparisons:
+//  1. Find a matching TDX Module Identity (in tdxModuleIdentities array of TCB Info) with its id set to "TDX_<version>" where <version> matches the value of TEE TCB SVN at index 1.
+//  2. For the selected TDX Module Identity, go over the sorted collection of TCB Levels (descending order) starting from the first item on the list
+//     and compare its isvsvn value to the TEE TCB SVN at index 0.
+//
+// If TEE TCB SVN at index 0 is greater or equal to its value, return the first TCB level as the matching level.
 func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIdentity, teeTcbSvn []byte) (*pcs.TcbLevel, error) {
 	tdxModuleVersion := []byte(teeTcbSvn[1:2])
 	tdxModuleIdentityID := tcbInfoTdxModuleIDPrefix + hex.EncodeToString(tdxModuleVersion)
@@ -914,6 +925,12 @@ func getMatchingTdxModuleTcbLevel(tcbInfoTdxModuleIdentities []pcs.TdxModuleIden
 	return nil, fmt.Errorf("could not find a TDX Module Identity (%q) matching the given TEE TDX version (%q)", tdxModuleIdentityID, tdxModuleVersion)
 }
 
+// getMatchingTcbLevel goes over TCB levels (descending order) retrieved from Intel PCS's TCB info and
+// perform the following comparisons:
+// 1. Compare all of the SGX TCB Comp SVNs retrieved from the SGX PCK Certificate are greater or equal to the corresponding values of SVNs in `sgxtcbcomponents` array of TCB Level.
+// 2. Compare PCESVN values retrieved from the SGX PCK certificate are greater or equal to the value in TCB level.
+// 3. Compare SVNs in TEE TCB SVN array retrieved from TD Report  are greater or equal to the corresponding values of SVNs in tdxtcbcomponents array of TCB Level.
+// If all checks pass, return the first TCB level as the matching level.
 func getMatchingTcbLevel(tcbLevels []pcs.TcbLevel, tdReport *pb.TDQuoteBody, pckCertPceSvn uint16, pckCertCPUSvnComponents []byte) (pcs.TcbLevel, error) {
 	for _, tcbLevel := range tcbLevels {
 		if isCPUSvnHigherOrEqual(pckCertCPUSvnComponents, tcbLevel.Tcb.SgxTcbcomponents) &&
@@ -925,41 +942,69 @@ func getMatchingTcbLevel(tcbLevels []pcs.TcbLevel, tdReport *pb.TDQuoteBody, pck
 	return pcs.TcbLevel{}, fmt.Errorf("no matching TCB level found")
 }
 
-func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) error {
+// readQeTcbStatus goes over Intel PCS's QE TCB results (descending order) and
+// find the first one that has ISVSVN that is lower or equal to the ISVSVN value from SGX Enclave Report.
+func readQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) (pcs.TcbLevel, error) {
 	for _, tcbLevel := range tcbLevels {
 		if tcbLevel.Tcb.Isvsvn <= isvsvn {
-			if tcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
-				return fmt.Errorf("TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, tcbLevel.TcbStatus)
-			}
-			return nil
+			return tcbLevel, nil
 		}
 	}
-	return ErrTcbStatus
+	return pcs.TcbLevel{}, fmt.Errorf("no matching QE TCB level found")
 }
 
-func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pckCertExtensions *pcs.PckExtensions) error {
+func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) error {
+	found, err := readQeTcbStatus(tcbLevels, isvsvn)
+	if err != nil {
+		return err
+	}
+
+	if found.TcbStatus == pcs.TcbComponentStatusOutOfDate {
+		return ErrEnclaveTcbStatus
+	}
+
+	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
+		return fmt.Errorf("QE TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
+	}
+
+	return nil
+}
+
+func readTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pckCertExtensions *pcs.PckExtensions) (pcs.TcbLevel, error) {
 	tcbLevels := tcbInfo.TcbLevels
 	matchingTcbLevel, err := getMatchingTcbLevel(tcbLevels, tdQuoteBody, pckCertExtensions.TCB.PCESvn, pckCertExtensions.TCB.CPUSvnComponents)
 	if err != nil {
-		return err
+		return pcs.TcbLevel{}, err
 	}
 	logger.V(2).Info("Matching TCB Level found: ", matchingTcbLevel)
 
 	if tdQuoteBody.GetTeeTcbSvn()[1] > 0 {
 		matchingTdxModuleTcbLevel, err := getMatchingTdxModuleTcbLevel(tcbInfo.TdxModuleIdentities, tdQuoteBody.GetTeeTcbSvn())
 		if err != nil {
-			return err
+			return pcs.TcbLevel{}, err
 		}
 		logger.V(2).Info("Tdx Module TCB Status found: ", matchingTdxModuleTcbLevel.TcbStatus)
-		if matchingTdxModuleTcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
-			return fmt.Errorf("TDX Module TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTdxModuleTcbLevel.TcbStatus)
-		}
+		return *matchingTdxModuleTcbLevel, nil
 	}
 
 	logger.V(2).Info("TCB Status found: ", matchingTcbLevel.TcbStatus)
-	if matchingTcbLevel.TcbStatus != pcs.TcbComponentStatusUpToDate {
-		return fmt.Errorf("TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, matchingTcbLevel.TcbStatus)
+	return matchingTcbLevel, nil
+}
+
+func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pckCertExtensions *pcs.PckExtensions) error {
+	found, err := readTcbInfoTcbStatus(tcbInfo, tdQuoteBody, pckCertExtensions)
+	if err != nil {
+		return err
 	}
+
+	if found.TcbStatus == pcs.TcbComponentStatusOutOfDate {
+		return ErrTdxTcbStatus
+	}
+
+	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
+		return fmt.Errorf("TDX TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
+	}
+
 	return nil
 }
 
@@ -1298,6 +1343,38 @@ func TdxQuote(quote any, options *Options) error {
 		return tdxQuoteV4(q, options)
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
+	}
+}
+
+// SupportedTcbLevelsFromCollateral returns the matching TCB levels of TDX TCB and QE Identity respectively by checking collaterals.
+// It is the caller's responsibility to verify the quote before calling this function.
+func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel, pcs.TcbLevel, error) {
+	if options == nil {
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, ErrOptionsNil
+	}
+	if err := verifyCollateral(options); err != nil {
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, err
+	}
+
+	if options.pckCertExtensions == nil {
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, ErrMissingPckExt
+	}
+
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		var err error
+		foundTcbInfo, tcbErr := readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBody(), options.pckCertExtensions)
+		if tcbErr != nil {
+			multierr.Combine(err, tcbErr)
+		}
+
+		foundQe, qeErr := readQeTcbStatus(options.collateral.QeIdentity.EnclaveIdentity.TcbLevels, q.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
+		if qeErr != nil {
+			multierr.Combine(err, qeErr)
+		}
+		return foundTcbInfo, foundQe, err
+	default:
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, fmt.Errorf("unsupported quote type: %T", quote)
 	}
 }
 
