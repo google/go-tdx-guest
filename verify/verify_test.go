@@ -17,6 +17,7 @@ package verify
 import (
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"os"
 	"reflect"
 	"testing"
@@ -673,8 +674,7 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 0
 	tcbInfo.TcbLevels[0].TcbStatus = "OutOfDate"
-	wantErr = `TCB Status is not "UpToDate", found "OutOfDate"`
-	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if gotErr, wantErr := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext), ErrTdxTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
 		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 }
@@ -699,15 +699,14 @@ func TestNegativeCheckQeStatusV4(t *testing.T) {
 	qeReport := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport()
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 10
-	wantErr := "unable to find latest status of TCB, it is now OutOfDate"
+	wantErr := "no matching QE TCB level found"
 	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err == nil || err.Error() != wantErr {
 		t.Errorf("No matching TCB level: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 0
 	qeIdentity.TcbLevels[0].TcbStatus = "OutOfDate"
-	wantErr = `TCB Status is not "UpToDate", found "OutOfDate"`
-	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err == nil || err.Error() != wantErr {
+	if gotErr, wantErr := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()), ErrEnclaveTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
 		t.Errorf("TCB status expired: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 }
@@ -761,5 +760,110 @@ func TestNegativeCheckRevocation(t *testing.T) {
 	wantErr := "unable to check for certificate revocation as GetCollateral parameter in the options is set to false"
 	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
 		t.Errorf("Check Revocation Without GetCollateral: RawTdxQuote() = %v. Want error %v", err, wantErr)
+	}
+}
+
+func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
+	getter := testcases.TestGetter
+
+	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
+	fmspc := hex.EncodeToString(fmspcBytes)
+
+	ca := platformIssuerID
+	collateral, err := obtainCollateral(fmspc, ca, &Options{Getter: getter})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tcbInfo := collateral.TdxTcbInfo.TcbInfo
+	// Due to updated SVN values in the sample response, it will result in TCB status failure,
+	// when compared to the TD Quote Body's TeeTcbSvn value.
+	// For the purpose of testing, converting all SVNs value to 0
+	setTcbSvnValues(0, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
+
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
+	}
+
+	chain, err := extractChainFromQuote(anyQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ext, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name     string
+		options  *Options
+		wantPass bool
+	}{
+		{
+			name: "success",
+			options: &Options{
+				GetCollateral:     true,
+				Now:               currentTime,
+				chain:             chain,
+				collateral:        collateral,
+				pckCertExtensions: ext,
+			},
+			wantPass: true,
+		},
+		{
+			name:     "failed with nil options",
+			options:  nil,
+			wantPass: false,
+		},
+		{
+			name: "failed with wrong collateral",
+			options: &Options{
+				GetCollateral:     true,
+				Now:               currentTime,
+				chain:             chain,
+				collateral:        &Collateral{},
+				pckCertExtensions: ext,
+			},
+			wantPass: false,
+		},
+		{
+			name: "failed with nil pckCertExtensions",
+			options: &Options{
+				GetCollateral:     true,
+				Now:               currentTime,
+				chain:             chain,
+				collateral:        &Collateral{},
+				pckCertExtensions: nil,
+			},
+			wantPass: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tdx, qe, err := SupportedTcbLevelsFromCollateral(quote, tc.options)
+			if gotPass := err == nil; gotPass != tc.wantPass {
+				t.Errorf("SupportedTcbLevelsFromCollateral() failed, got pass %v, but want %v", gotPass, tc.wantPass)
+			}
+			if tc.wantPass {
+				if got, want := tdx.TcbStatus, pcs.TcbComponentStatusUpToDate; got != want {
+					t.Errorf("SupportedTcbLevelsFromCollateral() didn't return expected TDX TCB status, got: %v, but want: %v", got, want)
+				}
+				if _, err := time.Parse(time.RFC3339, tdx.TcbDate); err != nil {
+					t.Errorf("SupportedTcbLevelsFromCollateral() didn't return expected TDX TCB Date format, got: %v, but want RFC3339 format", tdx.TcbDate)
+				}
+				if got, want := qe.TcbStatus, pcs.TcbComponentStatusUpToDate; got != want {
+					t.Errorf("SupportedTcbLevelsFromCollateral() didn't return expected QE TCB status, got: %v, but want: %v", got, want)
+				}
+				if _, err := time.Parse(time.RFC3339, qe.TcbDate); err != nil {
+					t.Errorf("SupportedTcbLevelsFromCollateral() didn't return expected QE TCB Date format, got: %v, but want RFC3339 format", qe.TcbDate)
+				}
+			}
+		})
 	}
 }
