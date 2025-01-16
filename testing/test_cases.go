@@ -17,6 +17,7 @@ package testing
 
 import (
 	labi "github.com/google/go-tdx-guest/client/linuxabi"
+	"github.com/google/go-tdx-guest/pcs"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
 
@@ -33,17 +34,17 @@ var qeIdentityIssuerChain = []string{
 
 // PckCrlHeader is the response header for pck crl
 var PckCrlHeader = map[string][]string{
-	"Sgx-Pck-Crl-Issuer-Chain": pckCrlIssuerChain,
+	pcs.SgxPckCrlIssuerChainPhrase: pckCrlIssuerChain,
 }
 
 // TcbInfoHeader is the response header for pck crl
 var TcbInfoHeader = map[string][]string{
-	"Tcb-Info-Issuer-Chain": tcbInfoIssuerChain,
+	pcs.TcbInfoIssuerChainPhrase: tcbInfoIssuerChain,
 }
 
 // QeIdentityHeader is the response header for pck crl
 var QeIdentityHeader = map[string][]string{
-	"Sgx-Enclave-Identity-Issuer-Chain": qeIdentityIssuerChain,
+	pcs.SgxQeIdentityIssuerChainPhrase: qeIdentityIssuerChain,
 }
 
 // TestGetter is a local getter tied to the included sample quote
