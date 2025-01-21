@@ -157,23 +157,20 @@ const (
 	tcbInfoVersion    = 3.0
 	qeIdentityVersion = 2.0
 
-	rootCertPhrase                 = "Intel SGX Root CA"
-	intermediateCertPhrase         = "Intel SGX PCK Platform CA"
-	pckCertPhrase                  = "Intel SGX PCK Certificate"
-	processorIssuer                = "Intel SGX PCK Processor CA"
-	processorIssuerID              = "processor"
-	platformIssuer                 = "Intel SGX PCK Platform CA"
-	platformIssuerID               = "platform"
-	sgxPckCrlIssuerChainPhrase     = "Sgx-Pck-Crl-Issuer-Chain"
-	sgxQeIdentityIssuerChainPhrase = "Sgx-Enclave-Identity-Issuer-Chain"
-	tcbInfoIssuerChainPhrase       = "Tcb-Info-Issuer-Chain"
-	tcbInfoPhrase                  = "tcbInfo"
-	enclaveIdentityPhrase          = "enclaveIdentity"
-	certificateType                = "CERTIFICATE"
-	tcbInfoID                      = "TDX"
-	qeIdentityID                   = "TD_QE"
-	tcbSigningPhrase               = "Intel SGX TCB Signing"
-	tcbInfoTdxModuleIDPrefix       = "TDX_"
+	rootCertPhrase           = "Intel SGX Root CA"
+	intermediateCertPhrase   = "Intel SGX PCK Platform CA"
+	pckCertPhrase            = "Intel SGX PCK Certificate"
+	processorIssuer          = "Intel SGX PCK Processor CA"
+	processorIssuerID        = "processor"
+	platformIssuer           = "Intel SGX PCK Platform CA"
+	platformIssuerID         = "platform"
+	tcbInfoPhrase            = "tcbInfo"
+	enclaveIdentityPhrase    = "enclaveIdentity"
+	certificateType          = "CERTIFICATE"
+	tcbInfoID                = "TDX"
+	qeIdentityID             = "TD_QE"
+	tcbSigningPhrase         = "Intel SGX TCB Signing"
+	tcbInfoTdxModuleIDPrefix = "TDX_"
 )
 
 // Options represents verification options for a TDX attestation quote.
@@ -357,7 +354,7 @@ func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) erro
 	if err != nil {
 		return CRLUnavailableErr{multierr.Append(err, errors.New("could not fetch PCK CRL"))}
 	}
-	pckCrlIntermediateCert, pckCrlRootCert, err := headerToIssuerChain(header, sgxPckCrlIssuerChainPhrase)
+	pckCrlIntermediateCert, pckCrlRootCert, err := headerToIssuerChain(header, pcs.SgxPckCrlIssuerChainPhrase)
 	if err != nil {
 		return err
 	}
@@ -382,7 +379,7 @@ func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) 
 		}
 	}
 
-	tcbInfoIntermediateCert, tcbInfoRootCert, err := headerToIssuerChain(header, tcbInfoIssuerChainPhrase)
+	tcbInfoIntermediateCert, tcbInfoRootCert, err := headerToIssuerChain(header, pcs.TcbInfoIssuerChainPhrase)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
 			Msg: err.Error(),
@@ -418,7 +415,7 @@ func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
 		}
 	}
 
-	qeIdentityIntermediateCert, qeIdentityRootCert, err := headerToIssuerChain(header, sgxQeIdentityIssuerChainPhrase)
+	qeIdentityIntermediateCert, qeIdentityRootCert, err := headerToIssuerChain(header, pcs.SgxQeIdentityIssuerChainPhrase)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
 			Msg: err.Error(),

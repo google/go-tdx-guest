@@ -35,6 +35,15 @@ const (
 	fmspcSize            = 6
 	pceIDSize            = 2
 	tcbComponentSize     = 16
+	// SgxPckCrlIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-revocation-v4
+	SgxPckCrlIssuerChainPhrase = "SGX-PCK-CRL-Issuer-Chain"
+	// SgxQeIdentityIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-enclave-identity-v4
+	SgxQeIdentityIssuerChainPhrase = "SGX-Enclave-Identity-Issuer-Chain"
+	// TcbInfoIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-tcb-info-tdx-v4
+	TcbInfoIssuerChainPhrase = "TCB-Info-Issuer-Chain"
 )
 
 var (
