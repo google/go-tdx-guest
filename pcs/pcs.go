@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -35,22 +36,30 @@ const (
 	fmspcSize            = 6
 	pceIDSize            = 2
 	tcbComponentSize     = 16
-	// SgxPckCrlIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	// sgxPckCrlIssuerChainHeaderKey retrieves the issuer chain from the Intel PCS API:
 	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-revocation-v4
-	SgxPckCrlIssuerChainPhrase = "SGX-PCK-CRL-Issuer-Chain"
-	// SgxQeIdentityIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	sgxPckCrlIssuerChainHeaderKey = "SGX-PCK-CRL-Issuer-Chain"
+	// sgxQeIdentityIssuerChainHeaderKey retrieves the issuer chain from the Intel PCS API:
 	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-enclave-identity-v4
-	SgxQeIdentityIssuerChainPhrase = "SGX-Enclave-Identity-Issuer-Chain"
-	// TcbInfoIssuerChainPhrase header key retrieves the issuer chain from the Intel PCS API:
+	sgxQeIdentityIssuerChainHeaderKey = "SGX-Enclave-Identity-Issuer-Chain"
+	// tcbInfoIssuerChainHeaderKey retrieves the issuer chain from the Intel PCS API:
 	// https://api.portal.trustedservices.intel.com/content/documentation.html#pcs-tcb-info-tdx-v4
-	TcbInfoIssuerChainPhrase = "TCB-Info-Issuer-Chain"
+	tcbInfoIssuerChainHeaderKey = "TCB-Info-Issuer-Chain"
+	// SgxBaseURL is the base URL for fetching SGX related info from the Intel PCS API.
+	SgxBaseURL = "https://api.trustedservices.intel.com/sgx/certification/v4"
+	// TdxBaseURL is the base URL for fetching TDX related info from the Intel PCS API.
+	TdxBaseURL = "https://api.trustedservices.intel.com/tdx/certification/v4"
 )
 
 var (
-	pcsSgxBaseURL = "https://api.trustedservices.intel.com/sgx/certification/v4"
-	pcsTdxBaseURL = "https://api.trustedservices.intel.com/tdx/certification/v4"
-
 	sgxTcbComponentOidPrefix = []int{1, 2, 840, 113741, 1, 13, 1, 2}
+
+	// SgxPckCrlIssuerChainPhrase conforms to the canonicalized header key format used by Go's net/http package.
+	SgxPckCrlIssuerChainPhrase = http.CanonicalHeaderKey(sgxPckCrlIssuerChainHeaderKey)
+	// SgxQeIdentityIssuerChainPhrase conforms to the canonicalized header key format used by Go's net/http package.
+	SgxQeIdentityIssuerChainPhrase = http.CanonicalHeaderKey(sgxQeIdentityIssuerChainHeaderKey)
+	// TcbInfoIssuerChainPhrase conforms to the canonicalized header key format used by Go's net/http package.
+	TcbInfoIssuerChainPhrase = http.CanonicalHeaderKey(tcbInfoIssuerChainHeaderKey)
 
 	// OidSgxExtension is the x509v3 extension for PCK certificate's SGX Extension.
 	OidSgxExtension = asn1.ObjectIdentifier([]int{1, 2, 840, 113741, 1, 13, 1})
@@ -462,15 +471,15 @@ func PckCertificateExtensions(cert *x509.Certificate) (*PckExtensions, error) {
 
 // PckCrlURL  returns the Intel PCS URL for retrieving PCK CRL
 func PckCrlURL(ca string) string {
-	return fmt.Sprintf("%s/pckcrl?ca=%s&encoding=der", pcsSgxBaseURL, ca)
+	return fmt.Sprintf("%s/pckcrl?ca=%s&encoding=der", SgxBaseURL, ca)
 }
 
 // TcbInfoURL returns the Intel PCS URL for retrieving TCB Info
 func TcbInfoURL(fmspc string) string {
-	return fmt.Sprintf("%s/tcb?fmspc=%s", pcsTdxBaseURL, fmspc)
+	return fmt.Sprintf("%s/tcb?fmspc=%s", TdxBaseURL, fmspc)
 }
 
 // QeIdentityURL returns the Intel PCS URL for retrieving QE identity
 func QeIdentityURL() string {
-	return fmt.Sprintf("%s/qe/identity", pcsTdxBaseURL)
+	return fmt.Sprintf("%s/qe/identity", TdxBaseURL)
 }
