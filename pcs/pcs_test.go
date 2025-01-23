@@ -20,7 +20,7 @@ import (
 )
 
 func TestPckCrlURL(t *testing.T) {
-	want := pcsSgxBaseURL + "/pckcrl?ca=platform&encoding=der"
+	want := SgxBaseURL + "/pckcrl?ca=platform&encoding=der"
 
 	if got := PckCrlURL("platform"); got != want {
 		t.Errorf(`PckCrlURL("platform") = %q. Expected %q`, got, want)
@@ -28,7 +28,7 @@ func TestPckCrlURL(t *testing.T) {
 }
 
 func TestTcbInfoURL(t *testing.T) {
-	want := pcsTdxBaseURL + "/tcb?fmspc=50806f000000"
+	want := TdxBaseURL + "/tcb?fmspc=50806f000000"
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
 	fmspc := hex.EncodeToString(fmspcBytes)
 	if got := TcbInfoURL(fmspc); got != want {
@@ -37,7 +37,7 @@ func TestTcbInfoURL(t *testing.T) {
 }
 
 func TestQeIdentityURL(t *testing.T) {
-	want := pcsTdxBaseURL + "/qe/identity"
+	want := TdxBaseURL + "/qe/identity"
 	if got := QeIdentityURL(); got != want {
 		t.Errorf("QEIdentityURL() = %q. Expected %q", got, want)
 	}
