@@ -57,7 +57,11 @@ func TestMain(m *testing.M) {
 	check = "./check"
 
 	logger.Init("CheckTestLog", false, false, os.Stderr)
-	os.Exit(m.Run())
+
+	code := m.Run()
+	// Cleanup `check` binary after all tests are done.
+	os.Remove("check")
+	os.Exit(code)
 }
 
 func withBaseArgs(config string, args ...string) []string {
