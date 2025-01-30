@@ -20,6 +20,7 @@ import (
 	"errors"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -491,6 +492,18 @@ func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	}
 	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
 		t.Error(err)
+	}
+
+	// Convert fmspc value to uppercase.
+	tcbInfo.Fmspc = strings.ToUpper(tcbInfo.Fmspc)
+	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
+		t.Errorf("verifyTdQuoteBody() failed with upppercased FMSPC value: %v", err)
+	}
+
+	// Convert fmspc value to lowercase.
+	tcbInfo.Fmspc = strings.ToLower(tcbInfo.Fmspc)
+	if err := verifyTdQuoteBody(quote.GetTdQuoteBody(), &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
+		t.Errorf("verifyTdQuoteBody() failed with lowercased FMSPC value: %v", err)
 	}
 }
 
