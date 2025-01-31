@@ -32,6 +32,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/google/go-tdx-guest/abi"
@@ -1007,7 +1008,8 @@ func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody *pb.TDQuoteBody, pck
 
 func verifyTdQuoteBody(tdQuoteBody *pb.TDQuoteBody, tdQuoteBodyOptions *tdQuoteBodyOptions) error {
 	logger.V(2).Infof("FMSPC from PCK Certificate is %q, and FMSPC value from Intel PCS's reported TDX TCB info is %q", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
-	if tdQuoteBodyOptions.pckCertExtensions.FMSPC != tdQuoteBodyOptions.tcbInfo.Fmspc {
+	// Converting FMSPCs to the same case and compare them in a memory-efficient way.
+	if !strings.EqualFold(tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc) {
 		return fmt.Errorf("FMSPC from PCK Certificate(%q) is not equal to FMSPC value from Intel PCS's reported TDX TCB info(%q)", tdQuoteBodyOptions.pckCertExtensions.FMSPC, tdQuoteBodyOptions.tcbInfo.Fmspc)
 	}
 
