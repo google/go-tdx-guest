@@ -183,8 +183,8 @@ type Options struct {
 	GetCollateral bool
 	// Getter takes a URL and returns the body of its contents. By default uses http.Get and returns the header and body
 	Getter trust.HTTPSGetter
-	// Now is the time at which to verify the validity of certificates and collaterals. If unset, uses time.Now().
-	Now time.Time
+	// Now is a time set at which to verify the validity of certificates and collaterals. If unset, uses defaultTimeset().
+	Now *TimeSet
 	// TrustedRoots specifies the root CertPool to trust when verifying PCK certificate chain.
 	// If nil, embedded certificate will be used
 	TrustedRoots *x509.CertPool
@@ -194,11 +194,30 @@ type Options struct {
 	pckCertExtensions *pcs.PckExtensions
 }
 
+// TimeSet holds a set of time instances to ensure accurate timing comparison.
+type TimeSet struct {
+	PckCertChain time.Time
+	TcbInfo      time.Time
+	QeIdentity   time.Time
+	PckCrl       time.Time
+	RootCaCrl    time.Time
+}
+
+func defaultTimeSet() *TimeSet {
+	return &TimeSet{
+		PckCertChain: time.Now(),
+		TcbInfo:      time.Now(),
+		QeIdentity:   time.Now(),
+		PckCrl:       time.Now(),
+		RootCaCrl:    time.Now(),
+	}
+}
+
 // DefaultOptions returns a useful default verification option setting
 func DefaultOptions() *Options {
 	return &Options{
 		Getter: trust.DefaultHTTPSGetter(),
-		Now:    time.Now(),
+		Now:    defaultTimeSet(),
 	}
 }
 
@@ -506,35 +525,35 @@ func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 	tcbInfo := collateral.TdxTcbInfo.TcbInfo
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
 
-	if currentTime.After(tcbInfo.NextUpdate) {
+	if currentTime.TcbInfo.After(tcbInfo.NextUpdate) {
 		return ErrTcbInfoExpired
 	}
-	if currentTime.After(qeIdentity.NextUpdate) {
+	if currentTime.QeIdentity.After(qeIdentity.NextUpdate) {
 		return ErrQeIdentityExpired
 	}
-	if currentTime.After(collateral.TcbInfoIssuerIntermediateCertificate.NotAfter) {
+	if currentTime.TcbInfo.After(collateral.TcbInfoIssuerIntermediateCertificate.NotAfter) {
 		return ErrTcbInfoSigningCertExpired
 	}
-	if currentTime.After(collateral.TcbInfoIssuerRootCertificate.NotAfter) {
+	if currentTime.TcbInfo.After(collateral.TcbInfoIssuerRootCertificate.NotAfter) {
 		return ErrTcbInfoRootCertExpired
 	}
-	if currentTime.After(collateral.QeIdentityIssuerRootCertificate.NotAfter) {
+	if currentTime.QeIdentity.After(collateral.QeIdentityIssuerRootCertificate.NotAfter) {
 		return ErrQeIdentityRootCertExpired
 	}
-	if currentTime.After(collateral.QeIdentityIssuerIntermediateCertificate.NotAfter) {
+	if currentTime.QeIdentity.After(collateral.QeIdentityIssuerIntermediateCertificate.NotAfter) {
 		return ErrQeIdentitySigningCertExpired
 	}
 	if options.CheckRevocations {
-		if currentTime.After(collateral.RootCaCrl.NextUpdate) {
+		if currentTime.RootCaCrl.After(collateral.RootCaCrl.NextUpdate) {
 			return ErrRootCaCrlExpired
 		}
-		if currentTime.After(collateral.PckCrl.NextUpdate) {
+		if currentTime.PckCrl.After(collateral.PckCrl.NextUpdate) {
 			return ErrPCKCrlExpired
 		}
-		if currentTime.After(collateral.PckCrlIssuerIntermediateCertificate.NotAfter) {
+		if currentTime.PckCrl.After(collateral.PckCrlIssuerIntermediateCertificate.NotAfter) {
 			return ErrPCKCrlSigningCertExpired
 		}
-		if currentTime.After(collateral.PckCrlIssuerRootCertificate.NotAfter) {
+		if currentTime.PckCrl.After(collateral.PckCrlIssuerRootCertificate.NotAfter) {
 			return ErrPCKCrlRootCertExpired
 		}
 	}
@@ -545,13 +564,13 @@ func checkCollateralExpiration(collateral *Collateral, options *Options) error {
 func checkCertificateExpiration(chain *PCKCertificateChain, options *Options) error {
 	currentTime := options.Now
 	logger.V(1).Info("Checking expiration status of certificates")
-	if currentTime.After(chain.RootCertificate.NotAfter) {
+	if currentTime.PckCertChain.After(chain.RootCertificate.NotAfter) {
 		return ErrRootCaCertExpired
 	}
-	if currentTime.After(chain.IntermediateCertificate.NotAfter) {
+	if currentTime.PckCertChain.After(chain.IntermediateCertificate.NotAfter) {
 		return ErrIntermediateCaCertExpired
 	}
-	if currentTime.After(chain.PCKCertificate.NotAfter) {
+	if currentTime.PckCertChain.After(chain.PCKCertificate.NotAfter) {
 		return ErrPckLeafCertExpired
 	}
 	logger.V(1).Info("Certificates are up-to-date")
@@ -794,7 +813,7 @@ func verifyPCKCertificationChain(options *Options) error {
 	}
 	logger.V(1).Info("PCK Leaf Certificate verified successfully")
 
-	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options.Now)); err != nil {
+	if _, err := pckCert.Verify(x509Options(options.TrustedRoots, intermediateCert, options.Now.PckCertChain)); err != nil {
 		return fmt.Errorf("error verifying PCK Certificate: %v (%v)", err, rootCert.IsCA)
 	}
 	logger.V(1).Info("PCK Certificate Chain verified successfully")
@@ -1177,7 +1196,7 @@ func tdxQeReportSignature(qeReport []byte, signature []byte, pckCert *x509.Certi
 	return nil
 }
 
-func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, signingCertificate *x509.Certificate, rawBody []byte, rawSignature string, crl *x509.RevocationList, options *Options) error {
+func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, signingCertificate *x509.Certificate, rawBody []byte, rawSignature string, crl *x509.RevocationList, options *Options, now time.Time) error {
 
 	logger.V(1).Info("Verifying root certificate in the issuer chain")
 	if err := validateCertificate(rootCertificate, rootCertificate, rootCertPhrase); err != nil {
@@ -1190,7 +1209,7 @@ func verifyResponse(signingPhrase string, rootCertificate *x509.Certificate, sig
 		return fmt.Errorf("unable to validate signing certificate in the issuer chain: %v", err)
 	}
 	logger.V(1).Info("Signing certificate verified successfully in the issuer chain")
-	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, options.Now)); err != nil {
+	if _, err := signingCertificate.Verify(x509Options(options.TrustedRoots, nil, now)); err != nil {
 		return fmt.Errorf("unable to verify signing certificate: %v", err)
 	}
 	logger.V(1).Info("Signing certificate successfully verified using trusted roots")
@@ -1253,7 +1272,7 @@ func verifyTCBinfo(options *Options) error {
 
 	logger.V(1).Info("Verifying TCB Info response")
 	if err := verifyResponse(tcbSigningPhrase, collateral.TcbInfoIssuerRootCertificate, collateral.TcbInfoIssuerIntermediateCertificate,
-		collateral.TcbInfoBody, signature, collateral.RootCaCrl, options); err != nil {
+		collateral.TcbInfoBody, signature, collateral.RootCaCrl, options, options.Now.TcbInfo); err != nil {
 		return fmt.Errorf("tcbInfo response verification failed: %v", err)
 	}
 
@@ -1280,7 +1299,7 @@ func verifyQeIdentity(options *Options) error {
 	}
 	logger.V(1).Info("Verifying QE Identity response")
 	if err := verifyResponse(tcbSigningPhrase, collateral.QeIdentityIssuerRootCertificate, collateral.QeIdentityIssuerIntermediateCertificate,
-		collateral.EnclaveIdentityBody, signature, collateral.RootCaCrl, options); err != nil {
+		collateral.EnclaveIdentityBody, signature, collateral.RootCaCrl, options, options.Now.QeIdentity); err != nil {
 		return fmt.Errorf("QeIdentity response verification failed: %v", err)
 	}
 
@@ -1420,8 +1439,8 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 	options.collateral = collateral
 	options.pckCertExtensions = exts
 	options.chain = chain
-	if options.Now.IsZero() {
-		options.Now = time.Now()
+	if options.Now == nil {
+		options.Now = defaultTimeSet()
 	}
 	return verifyEvidenceV4(quote, options)
 }
