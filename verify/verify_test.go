@@ -69,20 +69,20 @@ func TestParsePckChain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := extractChainFromQuote(quote); err != nil {
+	if _, err := ExtractChainFromQuote(quote); err != nil {
 		t.Fatal(err)
 	}
 
 	certChain := quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain
 	certChain = append(certChain, 0)
 	quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain = certChain
-	if _, err := extractChainFromQuote(quote); err != nil {
+	if _, err := ExtractChainFromQuote(quote); err != nil {
 		t.Error(err)
 	}
 
 	certChain[len(certChain)-1] = 1
 	quote.(*pb.QuoteV4).SignedData.CertificationData.QeReportCertificationData.PckCertificateChainData.PckCertChain = certChain
-	if _, err := extractChainFromQuote(quote); err == nil {
+	if _, err := ExtractChainFromQuote(quote); err == nil {
 		t.Error("Expected error but got none")
 	}
 }
@@ -93,7 +93,7 @@ func TestPckCertificateExtensions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +125,7 @@ func TestVerifyPckChainWithoutRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	pckChain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestNegativeVerifyPckChainWithoutRevocation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	pckChain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestVerifyPckLeafCertificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	pckChain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestValidateX509Certificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	pckChain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestNegativeValidateX509Certificate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pckChain, err := extractChainFromQuote(quote)
+	pckChain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func TestVerifyQuoteV4(t *testing.T) {
 	if !ok {
 		t.Fatal("Quote is not a QuoteV4")
 	}
-	pckChain, err := extractChainFromQuote(anyQuote)
+	pckChain, err := ExtractChainFromQuote(anyQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +409,7 @@ func TestExtractFmspcAndCaFromPckCert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,7 +481,7 @@ func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := extractChainFromQuote(anyQuote)
+	chain, err := ExtractChainFromQuote(anyQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -535,7 +535,7 @@ func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	if !ok {
 		t.Fatal("quote is not a QuoteV4")
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -668,7 +668,7 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 	if !ok {
 		t.Fatal("quote is not a QuoteV4")
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -741,7 +741,7 @@ func TestValidateCRL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := extractChainFromQuote(quote)
+	chain, err := ExtractChainFromQuote(quote)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -812,7 +812,7 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 		t.Fatal("quote is not a QuoteV4")
 	}
 
-	chain, err := extractChainFromQuote(anyQuote)
+	chain, err := ExtractChainFromQuote(anyQuote)
 	if err != nil {
 		t.Fatal(err)
 	}
