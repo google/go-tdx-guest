@@ -625,7 +625,9 @@ func verifyCollateral(options *Options) error {
 	return checkCollateralExpiration(collateral, options)
 }
 
-func extractChainFromQuote(quote any) (*PCKCertificateChain, error) {
+// ExtractChainFromQuote extracts a SGX PCK CertificateChain from a given TD quote.
+// It is the caller's responsibility to verify the quote before calling this function.
+func ExtractChainFromQuote(quote any) (*PCKCertificateChain, error) {
 	switch q := quote.(type) {
 	case *pb.QuoteV4:
 		return extractChainFromQuoteV4(q)
