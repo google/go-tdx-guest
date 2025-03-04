@@ -28,6 +28,20 @@ type HTTPSGetter interface {
 	Get(url string) (map[string][]string, []byte, error)
 }
 
+// ContextHTTPSGetter is an HTTPSGetter that takes an additional context input.
+type ContextHTTPSGetter interface {
+	GetContext(ctx context.Context, url string) (map[string][]string, []byte, error)
+}
+
+// GetWith fetches a resource from a URL with an HTTPSGetter. If the getter implements
+// ContextHTTPSGetter, the GetContext method will be used, otherwise the Get method.
+func GetWith(ctx context.Context, getter HTTPSGetter, url string) (map[string][]string, []byte, error) {
+	if contextGetter, ok := getter.(ContextHTTPSGetter); ok {
+		return contextGetter.GetContext(ctx, url)
+	}
+	return getter.Get(url)
+}
+
 // AttestationRecreationErr represents a problem with fetching or interpreting associated
 // API responses for a given API call. This is typically due to network unreliability.
 type AttestationRecreationErr struct {
@@ -43,9 +57,18 @@ type SimpleHTTPSGetter struct{}
 
 // Get uses http.Get to return the HTTPS response body as a byte array.
 func (n *SimpleHTTPSGetter) Get(url string) (map[string][]string, []byte, error) {
+	return n.GetContext(context.Background(), url)
+}
+
+// GetContext behaves like Get but forwards the context to the http package.
+func (n *SimpleHTTPSGetter) GetContext(ctx context.Context, url string) (map[string][]string, []byte, error) {
 	var header map[string][]string
 
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, nil, err
 	} else if resp.StatusCode >= 300 {
@@ -64,7 +87,8 @@ func (n *SimpleHTTPSGetter) Get(url string) (map[string][]string, []byte, error)
 
 // RetryHTTPSGetter is a meta-HTTPS getter that will retry on failure a given number of times.
 type RetryHTTPSGetter struct {
-	// Timeout is how long to retry before failure.
+	// Timeout is how long to retry before failure. If Timeout is zero, Get will retry indefinitely
+	// and GetContext will retry until the context expires.
 	Timeout time.Duration
 	// MaxRetryDelay is the maximum amount of time to wait between retries.
 	MaxRetryDelay time.Duration
@@ -74,10 +98,19 @@ type RetryHTTPSGetter struct {
 
 // Get fetches the body of the URL, retrying a given amount of times on failure.
 func (n *RetryHTTPSGetter) Get(url string) (map[string][]string, []byte, error) {
+	return n.GetContext(context.Background(), url)
+}
+
+// GetContext behaves like Get but forwards the context to the embedded Getter.
+func (n *RetryHTTPSGetter) GetContext(ctx context.Context, url string) (map[string][]string, []byte, error) {
 	delay := 2 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), n.Timeout)
+	cancel := func() {}
+	if n.Timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), n.Timeout)
+	}
+
 	for {
-		header, body, err := n.Getter.Get(url)
+		header, body, err := GetWith(ctx, n.Getter, url)
 		if err == nil {
 			cancel()
 			return header, body, nil
@@ -89,7 +122,7 @@ func (n *RetryHTTPSGetter) Get(url string) (map[string][]string, []byte, error) 
 		select {
 		case <-ctx.Done():
 			cancel()
-			return nil, nil, fmt.Errorf("timeout") // context cancelled
+			return nil, nil, ctx.Err()
 		case <-time.After(delay): // wait to retry
 		}
 	}

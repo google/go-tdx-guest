@@ -17,6 +17,7 @@ package verify
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/sha256"
@@ -182,6 +183,7 @@ type Options struct {
 	// GetCollateral set to true if the verifier should retrieve the collaterals from the network using PCS.
 	GetCollateral bool
 	// Getter takes a URL and returns the body of its contents. By default uses http.Get and returns the header and body
+	// If Getter implements trust.ContextHTTPSGetter, the context will be forwarded.
 	Getter trust.HTTPSGetter
 	// Now is a time set at which to verify the validity of certificates and collaterals. If unset, uses defaultTimeset().
 	Now *TimeSet
@@ -367,10 +369,10 @@ func bodyToRawMessage(name string, body []byte) ([]byte, error) {
 	return val, nil
 }
 
-func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) error {
+func getPckCrl(ctx context.Context, ca string, getter trust.HTTPSGetter, collateral *Collateral) error {
 	pckCrlURL := pcs.PckCrlURL(ca)
 	logger.V(2).Info("Getting PCK CRL: ", pckCrlURL)
-	header, body, err := getter.Get(pckCrlURL)
+	header, body, err := trust.GetWith(ctx, getter, pckCrlURL)
 	if err != nil {
 		return CRLUnavailableErr{multierr.Append(err, errors.New("could not fetch PCK CRL"))}
 	}
@@ -389,10 +391,10 @@ func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) erro
 	return nil
 }
 
-func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) error {
+func getTcbInfo(ctx context.Context, fmspc string, getter trust.HTTPSGetter, collateral *Collateral) error {
 	tcbInfoURL := pcs.TcbInfoURL(fmspc)
 	logger.V(2).Info("Getting TCB Info: ", tcbInfoURL)
-	header, body, err := getter.Get(tcbInfoURL)
+	header, body, err := trust.GetWith(ctx, getter, tcbInfoURL)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
 			Msg: fmt.Sprintf("could not receive tcbInfo response: %v", err),
@@ -425,10 +427,10 @@ func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) 
 	return nil
 }
 
-func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
+func getQeIdentity(ctx context.Context, getter trust.HTTPSGetter, collateral *Collateral) error {
 	qeIdentityURL := pcs.QeIdentityURL()
 	logger.V(2).Info("Getting QE Identity: ", qeIdentityURL)
-	header, body, err := getter.Get(qeIdentityURL)
+	header, body, err := trust.GetWith(ctx, getter, qeIdentityURL)
 	if err != nil {
 		return &trust.AttestationRecreationErr{
 			Msg: fmt.Sprintf("could not receive QeIdentity response: %v", err),
@@ -460,7 +462,7 @@ func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
 	return nil
 }
 
-func getRootCrl(getter trust.HTTPSGetter, collateral *Collateral) error {
+func getRootCrl(ctx context.Context, getter trust.HTTPSGetter, collateral *Collateral) error {
 	rootCrlURL := collateral.QeIdentityIssuerRootCertificate.CRLDistributionPoints // QE identity issuer chain's root certificate contains URL for Root CA CRL
 	if len(rootCrlURL) == 0 {
 		return ErrEmptyRootCRLUrl
@@ -468,7 +470,7 @@ func getRootCrl(getter trust.HTTPSGetter, collateral *Collateral) error {
 	logger.V(2).Info("Getting Root CA CRL: ", rootCrlURL)
 	var errs error
 	for i := range rootCrlURL {
-		_, body, err := getter.Get(rootCrlURL[i])
+		_, body, err := trust.GetWith(ctx, getter, rootCrlURL[i])
 		if err != nil {
 			errs = multierr.Append(errs, err)
 			continue
@@ -485,32 +487,32 @@ func getRootCrl(getter trust.HTTPSGetter, collateral *Collateral) error {
 	return CRLUnavailableErr{multierr.Append(errs, errors.New("could not fetch root CRL"))}
 }
 
-func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, error) {
+func obtainCollateral(ctx context.Context, fmspc string, ca string, options *Options) (*Collateral, error) {
 	getter := options.Getter
 	if getter == nil {
 		getter = trust.DefaultHTTPSGetter()
 	}
 	collateral := &Collateral{}
 	logger.V(1).Info("Getting TCB Info API response from the Intel PCS")
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(ctx, fmspc, getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive tcbInfo: %v", err)
 	}
 	logger.V(1).Info("Successfully received TCB Info API response from the Intel PCS")
 
 	logger.V(1).Info("Getting QE Identity API response from the Intel PCS")
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(ctx, getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive QeIdentity: %v", err)
 	}
 	logger.V(1).Info("Successfully received QE Identity API response from the Intel PCS")
 
 	if options.CheckRevocations {
 		logger.V(1).Info("Getting PCK CRL from the Intel PCS")
-		if err := getPckCrl(ca, getter, collateral); err != nil {
+		if err := getPckCrl(ctx, ca, getter, collateral); err != nil {
 			return nil, fmt.Errorf("unable to receive PCK CRL: %v", err)
 		}
 		logger.V(1).Info("Successfully received PCK CRL from the Intel PCS")
 		logger.V(1).Info("Getting Root CA CRL from the Intel PCS")
-		if err := getRootCrl(getter, collateral); err != nil {
+		if err := getRootCrl(ctx, getter, collateral); err != nil {
 			return nil, fmt.Errorf("unable to receive Root CA CRL: %v", err)
 		}
 		logger.V(1).Info("Successfully received Root CA CRL from the Intel PCS")
@@ -1355,12 +1357,17 @@ func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
 // based on the quote's SignatureAlgo, provided the certificate chain is valid for
 // formats - QuoteV4.
 func TdxQuote(quote any, options *Options) error {
+	return TdxQuoteContext(context.Background(), quote, options)
+}
+
+// TdxQuoteContext behaves like TdxQuote but passes the context to the HTTPSGetter.
+func TdxQuoteContext(ctx context.Context, quote any, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
 	}
 	switch q := quote.(type) {
 	case *pb.QuoteV4:
-		return tdxQuoteV4(q, options)
+		return tdxQuoteV4(ctx, q, options)
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
@@ -1400,7 +1407,7 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 
 // tdxQuoteV4 verifies the QuoteV4 protobuf representation of an attestation quote's signature
 // based on the quote's SignatureAlgo, provided the certificate chain is valid.
-func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
+func tdxQuoteV4(ctx context.Context, quote *pb.QuoteV4, options *Options) error {
 	logger.V(1).Info("Checking that the quote parameters meet the required size")
 	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
 	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
@@ -1432,7 +1439,7 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 		if err != nil {
 			return err
 		}
-		collateral, err = obtainCollateral(exts.FMSPC, ca, options)
+		collateral, err = obtainCollateral(ctx, exts.FMSPC, ca, options)
 		if err != nil {
 			return err
 		}
@@ -1449,12 +1456,17 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 
 // RawTdxQuote verifies the raw bytes representation of an attestation quote
 func RawTdxQuote(raw []byte, options *Options) error {
+	return RawTdxQuoteContext(context.Background(), raw, options)
+}
+
+// RawTdxQuoteContext behaves like RawTdxQuote but passes the context to the HTTPSGetter.
+func RawTdxQuoteContext(ctx context.Context, raw []byte, options *Options) error {
 	quote, err := abi.QuoteToProto(raw)
 	if err != nil {
 		return fmt.Errorf("could not convert raw bytes to QuoteV4: %v", err)
 	}
 
-	return TdxQuote(quote, options)
+	return TdxQuoteContext(ctx, quote, options)
 }
 
 func getTrustedRoots(rot *ccpb.RootOfTrust) (*x509.CertPool, error) {
