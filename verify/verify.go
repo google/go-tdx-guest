@@ -1385,12 +1385,12 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 		var err error
 		foundTcbInfo, tcbErr := readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBody(), options.pckCertExtensions)
 		if tcbErr != nil {
-			multierr.Combine(err, tcbErr)
+			err = multierr.Combine(err, tcbErr)
 		}
 
 		foundQe, qeErr := readQeTcbStatus(options.collateral.QeIdentity.EnclaveIdentity.TcbLevels, q.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
 		if qeErr != nil {
-			multierr.Combine(err, qeErr)
+			err = multierr.Combine(err, qeErr)
 		}
 		return foundTcbInfo, foundQe, err
 	default:

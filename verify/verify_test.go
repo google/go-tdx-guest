@@ -889,4 +889,22 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("regression test no TCB level", func(t *testing.T) {
+		collateral, err := obtainCollateral(fmspc, ca, &Options{Getter: getter})
+		if err != nil {
+			t.Fatal(err)
+		}
+		collateral.QeIdentity.EnclaveIdentity.TcbLevels = nil
+		_, _, err = SupportedTcbLevelsFromCollateral(quote, &Options{
+			GetCollateral:     true,
+			Now:               testTimeSet(currentTime),
+			chain:             chain,
+			collateral:        collateral,
+			pckCertExtensions: ext,
+		})
+		if err == nil {
+			t.Fatal("SupportedTcbLevelsFromCollateral() didn't return an error when TcbLevels were missing")
+		}
+	})
 }
