@@ -28,17 +28,58 @@ func TestPckCrlURL(t *testing.T) {
 }
 
 func TestTcbInfoURL(t *testing.T) {
-	want := TdxBaseURL + "/tcb?fmspc=50806f000000"
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
 	fmspc := hex.EncodeToString(fmspcBytes)
-	if got := TcbInfoURL(fmspc); got != want {
-		t.Errorf("TcbInfoURL(%q) = %q. Expected %q", fmspc, got, want)
+
+	testCases := []struct {
+		name          string
+		updateChannel CollateralUpdate
+		wantUrl       string
+	}{
+		{
+			name:          "success with standard access",
+			updateChannel: CollateralUpdateStandard,
+			wantUrl:       TdxBaseURL + "/tcb?fmspc=50806f000000&update=standard",
+		},
+		{
+			name:          "success with early access",
+			updateChannel: CollateralUpdateEarly,
+			wantUrl:       TdxBaseURL + "/tcb?fmspc=50806f000000&update=early",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := TcbInfoURL(fmspc, tc.updateChannel); got != tc.wantUrl {
+				t.Errorf("TcbInfoURL(%q) = %q. Expected %q", fmspc, got, tc.wantUrl)
+			}
+		})
 	}
 }
 
 func TestQeIdentityURL(t *testing.T) {
-	want := TdxBaseURL + "/qe/identity"
-	if got := QeIdentityURL(); got != want {
-		t.Errorf("QEIdentityURL() = %q. Expected %q", got, want)
+	testCases := []struct {
+		name          string
+		updateChannel CollateralUpdate
+		wantUrl       string
+	}{
+		{
+			name:          "success with standard access",
+			updateChannel: CollateralUpdateStandard,
+			wantUrl:       TdxBaseURL + "/qe/identity?update=standard",
+		},
+		{
+			name:          "success with early access",
+			updateChannel: CollateralUpdateEarly,
+			wantUrl:       TdxBaseURL + "/qe/identity?update=early",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := QeIdentityURL(tc.updateChannel); got != tc.wantUrl {
+				t.Errorf("QEIdentityURL() = %q. Expected %q", got, tc.wantUrl)
+			}
+		})
 	}
 }

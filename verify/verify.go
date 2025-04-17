@@ -181,6 +181,8 @@ type Options struct {
 	CheckRevocations bool
 	// GetCollateral set to true if the verifier should retrieve the collaterals from the network using PCS.
 	GetCollateral bool
+	// CollateralUpdate specifies the update channel used when retrieving the collaterals from PCS.
+	CollateralUpdate pcs.CollateralUpdate
 	// Getter takes a URL and returns the body of its contents. By default uses http.Get and returns the header and body
 	Getter trust.HTTPSGetter
 	// Now is a time set at which to verify the validity of certificates and collaterals. If unset, uses defaultTimeset().
@@ -389,8 +391,8 @@ func getPckCrl(ca string, getter trust.HTTPSGetter, collateral *Collateral) erro
 	return nil
 }
 
-func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) error {
-	tcbInfoURL := pcs.TcbInfoURL(fmspc)
+func getTcbInfo(fmspc string, update pcs.CollateralUpdate, getter trust.HTTPSGetter, collateral *Collateral) error {
+	tcbInfoURL := pcs.TcbInfoURL(fmspc, update)
 	logger.V(2).Info("Getting TCB Info: ", tcbInfoURL)
 	header, body, err := getter.Get(tcbInfoURL)
 	if err != nil {
@@ -425,8 +427,8 @@ func getTcbInfo(fmspc string, getter trust.HTTPSGetter, collateral *Collateral) 
 	return nil
 }
 
-func getQeIdentity(getter trust.HTTPSGetter, collateral *Collateral) error {
-	qeIdentityURL := pcs.QeIdentityURL()
+func getQeIdentity(update pcs.CollateralUpdate, getter trust.HTTPSGetter, collateral *Collateral) error {
+	qeIdentityURL := pcs.QeIdentityURL(update)
 	logger.V(2).Info("Getting QE Identity: ", qeIdentityURL)
 	header, body, err := getter.Get(qeIdentityURL)
 	if err != nil {
@@ -490,15 +492,19 @@ func obtainCollateral(fmspc string, ca string, options *Options) (*Collateral, e
 	if getter == nil {
 		getter = trust.DefaultHTTPSGetter()
 	}
+	update := options.CollateralUpdate
+	if update == "" {
+		update = pcs.CollateralUpdateStandard
+	}
 	collateral := &Collateral{}
 	logger.V(1).Info("Getting TCB Info API response from the Intel PCS")
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(fmspc, update, getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive tcbInfo: %v", err)
 	}
 	logger.V(1).Info("Successfully received TCB Info API response from the Intel PCS")
 
 	logger.V(1).Info("Getting QE Identity API response from the Intel PCS")
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(update, getter, collateral); err != nil {
 		return nil, fmt.Errorf("unable to receive QeIdentity: %v", err)
 	}
 	logger.V(1).Info("Successfully received QE Identity API response from the Intel PCS")

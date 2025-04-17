@@ -379,23 +379,62 @@ func TestGetTcbInfo(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
-		t.Error(err)
+
+	testCases := []struct {
+		name          string
+		updateChannel pcs.CollateralUpdate
+	}{
+		{
+			name:          "success with standard access",
+			updateChannel: pcs.CollateralUpdateStandard,
+		},
+		{
+			name:          "success with early access",
+			updateChannel: pcs.CollateralUpdateEarly,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := getTcbInfo(fmspc, tc.updateChannel, getter, collateral); err != nil {
+				t.Error(err)
+			}
+		})
 	}
 }
 
 func TestGetQeIdentity(t *testing.T) {
 	getter := testcases.TestGetter
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
-		t.Error(err)
+
+	testCases := []struct {
+		name          string
+		updateChannel pcs.CollateralUpdate
+	}{
+		{
+			name:          "success with standard access",
+			updateChannel: pcs.CollateralUpdateStandard,
+		},
+		{
+			name:          "success with early access",
+			updateChannel: pcs.CollateralUpdateEarly,
+		},
 	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := getQeIdentity(tc.updateChannel, getter, collateral); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+
 }
 
 func TestGetRootCRL(t *testing.T) {
 	getter := testcases.TestGetter
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 
@@ -474,7 +513,7 @@ func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(fmspc, pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -524,7 +563,7 @@ func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(fmspc, pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -580,7 +619,7 @@ func TestVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -604,7 +643,7 @@ func TestNegativeVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -657,7 +696,7 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(fmspc, pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -706,7 +745,7 @@ func TestNegativeCheckQeStatusV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -750,7 +789,7 @@ func TestValidateCRL(t *testing.T) {
 	if err := getPckCrl(ca, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(pcs.CollateralUpdateStandard, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	if err := getRootCrl(getter, collateral); err != nil {

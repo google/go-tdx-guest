@@ -223,6 +223,16 @@ const (
 	TcbComponentStatusRevoked TcbComponentStatus = "Revoked"
 )
 
+// CollateralUpdate represents the `update` query parameter of the Intel PCS API service
+type CollateralUpdate string
+
+const (
+	// CollateralUpdateStandard represents the standard access channel to updated collateral provided as part of a TCB recovery event
+	CollateralUpdateStandard CollateralUpdate = "standard"
+	// CollateralUpdateEarly represents the early access channel to updated collaterals provided as part of a TCB recovery event
+	CollateralUpdateEarly CollateralUpdate = "early"
+)
+
 // UnmarshalJSON for TcbComponentStatus maps tcb status to corresponding valid strings
 func (st *TcbComponentStatus) UnmarshalJSON(s []byte) error {
 	unquotedStatus, err := strconv.Unquote(string(s))
@@ -475,11 +485,11 @@ func PckCrlURL(ca string) string {
 }
 
 // TcbInfoURL returns the Intel PCS URL for retrieving TCB Info
-func TcbInfoURL(fmspc string) string {
-	return fmt.Sprintf("%s/tcb?fmspc=%s", TdxBaseURL, fmspc)
+func TcbInfoURL(fmspc string, update CollateralUpdate) string {
+	return fmt.Sprintf("%s/tcb?fmspc=%s&update=%s", TdxBaseURL, fmspc, update)
 }
 
 // QeIdentityURL returns the Intel PCS URL for retrieving QE identity
-func QeIdentityURL() string {
-	return fmt.Sprintf("%s/qe/identity", TdxBaseURL)
+func QeIdentityURL(update CollateralUpdate) string {
+	return fmt.Sprintf("%s/qe/identity?update=%s", TdxBaseURL, update)
 }
