@@ -50,11 +50,19 @@ var QeIdentityHeader = map[string][]string{
 // TestGetter is a local getter tied to the included sample quote
 var TestGetter = &Getter{
 	Responses: map[string]HTTPResponse{
-		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity": {
+		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity?update=standard": {
 			Header: QeIdentityHeader,
 			Body:   testdata.QeIdentityBody,
 		},
-		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000": {
+		"https://api.trustedservices.intel.com/tdx/certification/v4/qe/identity?update=early": {
+			Header: QeIdentityHeader,
+			Body:   testdata.QeIdentityBody,
+		},
+		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000&update=standard": {
+			Header: TcbInfoHeader,
+			Body:   testdata.TcbInfoBody,
+		},
+		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=50806f000000&update=early": {
 			Header: TcbInfoHeader,
 			Body:   testdata.TcbInfoBody,
 		},
