@@ -15,6 +15,7 @@
 package verify
 
 import (
+	"context"
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
@@ -273,10 +274,24 @@ func TestNegativeValidateX509Certificate(t *testing.T) {
 
 func TestRawQuoteVerifyWithoutCollateral(t *testing.T) {
 	options := &Options{CheckRevocations: false, GetCollateral: false, Now: testTimeSet(currentTime)}
-	if err := RawTdxQuote(testdata.RawQuote, options); err != nil {
-		t.Error(err)
+	for name, rawTdxQuote := range rawTdxQuoteFuncs {
+		t.Run(name, func(t *testing.T) {
+			if err := rawTdxQuote(testdata.RawQuote, options); err != nil {
+				t.Errorf("%s() returned unexpected error: %v", name, err)
+			}
+		})
 	}
 }
+
+func TestRawQuoteVerifyWithoutCollateralAndCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	options := &Options{CheckRevocations: false, GetCollateral: false, Now: testTimeSet(currentTime)}
+	if err := RawTdxQuoteContext(ctx, testdata.RawQuote, options); err != nil {
+		t.Errorf("cancelled context caused error even though GetCollateral=false: %v", err)
+	}
+}
+
 func TestVerifyQuoteV4(t *testing.T) {
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
 	if err != nil {
@@ -368,7 +383,7 @@ func TestGetPckCrl(t *testing.T) {
 	getter := testcases.TestGetter
 	ca := platformIssuerID
 	collateral := &Collateral{}
-	if err := getPckCrl(ca, getter, collateral); err != nil {
+	if err := getPckCrl(context.Background(), ca, getter, collateral); err != nil {
 		t.Error(err)
 	}
 }
@@ -379,7 +394,7 @@ func TestGetTcbInfo(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
 		t.Error(err)
 	}
 }
@@ -387,7 +402,7 @@ func TestGetTcbInfo(t *testing.T) {
 func TestGetQeIdentity(t *testing.T) {
 	getter := testcases.TestGetter
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Error(err)
 	}
 }
@@ -395,11 +410,11 @@ func TestGetQeIdentity(t *testing.T) {
 func TestGetRootCRL(t *testing.T) {
 	getter := testcases.TestGetter
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := getRootCrl(getter, collateral); err != nil {
+	if err := getRootCrl(context.Background(), getter, collateral); err != nil {
 		t.Error(err)
 	}
 }
@@ -439,7 +454,7 @@ func TestObtainAndVerifyCollateral(t *testing.T) {
 	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
 	fmspc := hex.EncodeToString(fmspcBytes)
 	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, Now: testTimeSet(currentTime)}
-	collateral, err := obtainCollateral(fmspc, ca, options)
+	collateral, err := obtainCollateral(context.Background(), fmspc, ca, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +471,7 @@ func TestNegativeObtainAndVerifyCollateral(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	options := &Options{GetCollateral: true, CheckRevocations: true, Getter: getter, Now: testTimeSet(futureTime)}
-	collateral, err := obtainCollateral(fmspc, ca, options)
+	collateral, err := obtainCollateral(context.Background(), fmspc, ca, options)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -474,7 +489,7 @@ func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -524,7 +539,7 @@ func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -580,7 +595,7 @@ func TestVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -604,7 +619,7 @@ func TestNegativeVerifyUsingQeIdentityV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -657,7 +672,7 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	collateral := &Collateral{}
-	if err := getTcbInfo(fmspc, getter, collateral); err != nil {
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -706,7 +721,7 @@ func TestNegativeCheckQeStatusV4(t *testing.T) {
 	getter := testcases.TestGetter
 
 	collateral := &Collateral{}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
@@ -747,13 +762,13 @@ func TestValidateCRL(t *testing.T) {
 	}
 	ca := platformIssuerID
 	collateral := &Collateral{}
-	if err := getPckCrl(ca, getter, collateral); err != nil {
+	if err := getPckCrl(context.Background(), ca, getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	if err := getQeIdentity(getter, collateral); err != nil {
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
-	if err := getRootCrl(getter, collateral); err != nil {
+	if err := getRootCrl(context.Background(), getter, collateral); err != nil {
 		t.Fatal(err)
 	}
 
@@ -772,8 +787,12 @@ func TestNegativeRawQuoteVerifyWithCollateral(t *testing.T) {
 	wantErr := "TDX TCB info reported by Intel PCS failed TCB status check: no matching TCB level found"
 	// Due to updated SVN values in the sample response, it will result in TCB status failure,
 	// when compared to the TD Quote Body's TeeTcbSvn value.
-	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
-		t.Errorf("No matching TCB: RawTdxQuote() = %v. Want error %v", err, wantErr)
+	for name, rawTdxQuote := range rawTdxQuoteFuncs {
+		t.Run(name, func(t *testing.T) {
+			if err := rawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
+				t.Errorf("No matching TCB: %s() = %v. Want error %v", name, err, wantErr)
+			}
+		})
 	}
 }
 
@@ -781,8 +800,12 @@ func TestNegativeCheckRevocation(t *testing.T) {
 	getter := testcases.TestGetter
 	options := &Options{CheckRevocations: true, GetCollateral: false, Getter: getter}
 	wantErr := "unable to check for certificate revocation as GetCollateral parameter in the options is set to false"
-	if err := RawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
-		t.Errorf("Check Revocation Without GetCollateral: RawTdxQuote() = %v. Want error %v", err, wantErr)
+	for name, rawTdxQuote := range rawTdxQuoteFuncs {
+		t.Run(name, func(t *testing.T) {
+			if err := rawTdxQuote(testdata.RawQuote, options); err == nil || err.Error() != wantErr {
+				t.Errorf("Check Revocation Without GetCollateral: %s() = %v. Want error %v", name, err, wantErr)
+			}
+		})
 	}
 }
 
@@ -793,7 +816,7 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 	fmspc := hex.EncodeToString(fmspcBytes)
 
 	ca := platformIssuerID
-	collateral, err := obtainCollateral(fmspc, ca, &Options{Getter: getter})
+	collateral, err := obtainCollateral(context.Background(), fmspc, ca, &Options{Getter: getter})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -891,7 +914,7 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 	}
 
 	t.Run("regression test no TCB level", func(t *testing.T) {
-		collateral, err := obtainCollateral(fmspc, ca, &Options{Getter: getter})
+		collateral, err := obtainCollateral(context.Background(), fmspc, ca, &Options{Getter: getter})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -907,4 +930,11 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 			t.Fatal("SupportedTcbLevelsFromCollateral() didn't return an error when TcbLevels were missing")
 		}
 	})
+}
+
+var rawTdxQuoteFuncs = map[string]func([]byte, *Options) error{
+	"RawTdxQuote": RawTdxQuote,
+	"RawTdxQuoteContext": func(quote []byte, options *Options) error {
+		return RawTdxQuoteContext(context.Background(), quote, options)
+	},
 }
