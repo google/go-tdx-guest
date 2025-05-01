@@ -26,10 +26,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-eventlog/ccel"
+	"github.com/google/go-eventlog/extract"
 	"github.com/google/go-sev-guest/tools/lib/cmdline"
 	"github.com/google/go-tdx-guest/abi"
 	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
+	"github.com/google/go-tdx-guest/rtmr"
 	testcases "github.com/google/go-tdx-guest/testing"
 	"github.com/google/go-tdx-guest/validate"
 	"github.com/google/go-tdx-guest/verify"
@@ -56,6 +59,11 @@ const (
 	exitNetwork = 3
 	// Exit code 4 - the quote did not validate according to policy.
 	exitPolicy = 4
+	// Exit code 5 - CCEL event log parsing error.
+	exitParse           = 5
+	ccelEventLogFile    = "/sys/firmware/acpi/tables/data/CCEL"
+	acpiTableFile       = "/sys/firmware/acpi/tables/CCEL"
+	parseCcelOutputFile = "result.textproto"
 )
 
 var (
@@ -67,6 +75,7 @@ var (
 			" overwrite the message's associated field. By default, the file will be unmarshalled as binary," +
 			" but if it ends in .textproto, it will be unmarshalled as prototext instead."))
 	quiet     = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
+	parseCCEL = flag.Bool("parse_ccel", false, "If true, parses the CCEL, and replays the events against the RTMR values from the verified TD quote. This will dump the result into a \"result.textproto\" file under the current directory.")
 	verbosity = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output")
 
 	qevendoridS    = flag.String("qe_vendor_id", "", "The expected QE_VENDOR_ID field as a hex string. Must encode 16 bytes. Unchecked if unset.")
@@ -365,6 +374,38 @@ func populateConfig() error {
 	)
 }
 
+func parseCcelAndWriteOutput(quote any) error {
+	rtmrBank, err := rtmr.GetRtmrsFromTdQuote(quote)
+	if err != nil {
+		return fmt.Errorf("failed to extract RTMR banks from TD quote: %w", err)
+	}
+	ccelData, err := os.ReadFile(ccelEventLogFile)
+	if err != nil {
+		return fmt.Errorf("failed to read CCEL data file: %w", err)
+	}
+	ccelTable, err := os.ReadFile(acpiTableFile)
+	if err != nil {
+		return fmt.Errorf("failed to read CCEL ACPI table file: %w", err)
+	}
+	fls, err := ccel.ReplayAndExtract(ccelTable, ccelData, *rtmrBank, extract.Opts{Loader: extract.GRUB})
+	if err != nil {
+		return fmt.Errorf("failed to extract CCEL event log info: %w", err)
+	}
+	mo := prototext.MarshalOptions{
+		Multiline: true,
+		Indent:    " ",
+		EmitASCII: true,
+	}
+	bytes, err := mo.Marshal(fls)
+	if err != nil {
+		return fmt.Errorf("failed to marshal FirmwareLogState to bytes: %w", err)
+	}
+	if err := os.WriteFile(parseCcelOutputFile, bytes, 0644); err != nil {
+		return fmt.Errorf("failed to write output file: %w", err)
+	}
+	return nil
+}
+
 func main() {
 	logger.Init("", false, false, os.Stdout)
 	flag.Parse()
@@ -437,6 +478,11 @@ func main() {
 	}
 	if err := validate.TdxQuote(quote, opts); err != nil {
 		dieWith(fmt.Errorf("error validating the TDX Quote: %v", err), exitPolicy)
+	}
+	if *parseCCEL {
+		if err := parseCcelAndWriteOutput(quote); err != nil {
+			dieWith(fmt.Errorf("error parsing CCEL event log: %v", err), exitParse)
+		}
 	}
 	logger.V(1).Info("TDX Quote validated successfully")
 }

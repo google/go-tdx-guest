@@ -31,6 +31,14 @@ Default value is `bin`.
 
 If set, doesn't write exit errors to Stdout. All results are communicated through exit code.
 
+### `-parse_ccel`
+
+If true, parses a Confidential Computing event log and replays the parsed event log
+against the RTMR banks extracted from the verified TD quote. 
+The parsed results are then saved to a **result.textproto** file in the current directory.
+
+Default `false`.
+
 ### `-verbosity`
 
 Used to set the verbosity of logger, where higher number means more verbose output.
