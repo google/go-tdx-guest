@@ -57,7 +57,7 @@ type SimpleHTTPSGetter struct{}
 
 // Get uses http.Get to return the HTTPS response body as a byte array.
 func (n *SimpleHTTPSGetter) Get(url string) (map[string][]string, []byte, error) {
-	return n.GetContext(context.Background(), url)
+	return n.GetContext(context.TODO(), url)
 }
 
 // GetContext behaves like Get but forwards the context to the http package.
@@ -98,7 +98,7 @@ type RetryHTTPSGetter struct {
 
 // Get fetches the body of the URL, retrying a given amount of times on failure.
 func (n *RetryHTTPSGetter) Get(url string) (map[string][]string, []byte, error) {
-	return n.GetContext(context.Background(), url)
+	return n.GetContext(context.TODO(), url)
 }
 
 // GetContext behaves like Get but forwards the context to the embedded Getter.
@@ -106,7 +106,7 @@ func (n *RetryHTTPSGetter) GetContext(ctx context.Context, url string) (map[stri
 	delay := 2 * time.Second
 	cancel := func() {}
 	if n.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), n.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, n.Timeout)
 	}
 
 	for {
