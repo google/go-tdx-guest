@@ -1357,7 +1357,7 @@ func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
 // based on the quote's SignatureAlgo, provided the certificate chain is valid for
 // formats - QuoteV4.
 func TdxQuote(quote any, options *Options) error {
-	return TdxQuoteContext(context.Background(), quote, options)
+	return TdxQuoteContext(context.TODO(), quote, options)
 }
 
 // TdxQuoteContext behaves like TdxQuote but passes the context to the HTTPSGetter.
@@ -1456,7 +1456,7 @@ func tdxQuoteV4(ctx context.Context, quote *pb.QuoteV4, options *Options) error 
 
 // RawTdxQuote verifies the raw bytes representation of an attestation quote
 func RawTdxQuote(raw []byte, options *Options) error {
-	return RawTdxQuoteContext(context.Background(), raw, options)
+	return RawTdxQuoteContext(context.TODO(), raw, options)
 }
 
 // RawTdxQuoteContext behaves like RawTdxQuote but passes the context to the HTTPSGetter.
