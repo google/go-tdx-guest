@@ -31,6 +31,10 @@ Used to set the verbosity of logger, where higher number means more verbose outp
 
 Default value is `0`.
 
+### `-verify`
+
+Used to verify that the hardware extension functionality of sysfs interface matches a software simulation.
+
 ## Examples
 
 The following example measures an event log and extends its measurement into the RTMR2

@@ -16,10 +16,15 @@
 package main
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/rand"
+	"crypto/sha512"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	"github.com/google/go-tdx-guest/rtmr"
@@ -36,6 +41,7 @@ var (
 	quiet     = flag.Bool("quiet", false, "If true, writes nothing the stdout or stderr. Success is exit code 0, failure exit code 1.")
 	verbosity = flag.Int("verbosity", 0, "The output verbosity. Higher number means more verbose output.")
 	index     = flag.Int("rtmr", 2, "The rtmr index. Must be 2 or 3. Defaults to 2.")
+	verify    = flag.Bool("verify", false, "Runs a loop of 10 random extensions and verifies the result against a software simulation.")
 )
 
 func dieWith(err error, exitCode int) {
@@ -68,11 +74,73 @@ func readEventLog() ([]byte, error) {
 	return contents, nil
 }
 
+// runVerificationLoop performs 10 rounds of extending an RTMR with random data,
+// verifying that the hardware extension matches a software simulation.
+func runVerificationLoop(filePath string, hashAlgo crypto.Hash, digestSize int) error {
+	for i := 0; i < 10; i++ {
+		// Read the digest before extension.
+		initialData, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read original digest from %s: %w", filePath, err)
+		}
+		fmt.Printf("read back original digest: %s\n", hex.EncodeToString(initialData))
+
+		// Create the software hasher and prime it with the initial digest.
+		hasher := hashAlgo.New()
+		hasher.Write(initialData)
+
+		// Create a random event to extend.
+		eventData := make([]byte, digestSize)
+		if _, err := rand.Read(eventData); err != nil {
+			return fmt.Errorf("error generating random data: %w", err)
+		}
+
+		fmt.Printf("\nExtension #%d:\n", i+1)
+		fmt.Printf("  - Random Event Data (hex): %s\n", hex.EncodeToString(eventData))
+
+		// Perform the hardware extension by writing the event data to the device.
+		if err := ioutil.WriteFile(filePath, eventData, 0644); err != nil {
+			return fmt.Errorf("error writing to file %s: %w", filePath, err)
+		}
+
+		// Read the new digest back from the hardware.
+		readDigest, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read back from %s for verification: %w", filePath, err)
+		}
+
+		// Perform the software extension.
+		hasher.Write(eventData)
+		expectedDigest := hasher.Sum(nil)
+
+		// Verify that the hardware result matches the software simulation.
+		fmt.Printf("expected value: %s\n", hex.EncodeToString(expectedDigest))
+		fmt.Printf("read back value: %s\n", hex.EncodeToString(readDigest))
+		if !bytes.Equal(expectedDigest, readDigest) {
+			return fmt.Errorf("verification failed: hardware and software digests do not match for %s", filePath)
+		}
+		fmt.Printf("Successfully verified extension for %s in test round %d\n", filePath, i+1)
+	}
+	return nil
+}
+
 func main() {
 	logger.Init("", false, false, os.Stdout)
 	flag.Parse()
 	logger.SetLevel(logger.Level(*verbosity))
 
+	if *verify {
+		filePath := fmt.Sprintf("/sys/class/misc/tdx_guest/measurements/rtmr%d:sha384", *index)
+		const hashAlgo = crypto.SHA384
+		const digestSize = sha512.Size384
+		fmt.Println("\n--- Looping 10 times with random value extensions, write and read back the digest for comparison---")
+		if err := runVerificationLoop(filePath, hashAlgo, digestSize); err != nil {
+			fmt.Fprintf(os.Stderr, "Verification failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("All verification rounds passed successfully.")
+		return
+	}
 	eventLog, err := readEventLog()
 	if err != nil {
 		die(err)
