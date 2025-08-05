@@ -57,7 +57,9 @@ func outputReport(data [labi.TdReportDataSize]byte, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		out.Write(bytes)
+		if _, err := out.Write(bytes); err != nil {
+			return err
+		}
 		return nil
 	}
 	quote, err := client.GetQuote(tdxQuoteProvider, data)
@@ -74,7 +76,9 @@ func marshalAndWriteBytes(quote any, out io.Writer) error {
 		if err != nil {
 			return err
 		}
-		out.Write(bytes)
+		if _, err := out.Write(bytes); err != nil {
+			return err
+		}
 		return nil
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
