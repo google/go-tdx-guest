@@ -20,6 +20,14 @@ import (
 	"testing"
 
 	"github.com/google/go-configfs-tsm/configfs/fakertmr"
+
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"os"
+	// Import for the side-effect of registering the SHA384 hash algorithm.
+	_ "golang.org/x/crypto/sha3"
 )
 
 func TestExtendEventLogOk(t *testing.T) {
@@ -76,5 +84,70 @@ func TestExtendDigestErr(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 			t.Fatalf("ExtendDigest(%d, %v) failed: %v, want %q", tc.rtmr, tc.digest, err, tc.wantErr)
 		}
+	}
+}
+
+// TestRtmrExtendVerification performs multiple rounds of extending an RTMR and verifies the result.
+// It reads the initial state, calls ExtendDigestSysfs to perform the hardware extension,
+// and compares the new hardware state against a software-simulated extension.
+func TestRtmrExtendVerification(t *testing.T) {
+	testCases := []struct {
+		name      string
+		rtmrIndex int
+		hashAlgo  crypto.Hash
+	}{
+		{"RTMR0_SHA384", 0, crypto.SHA384},
+		{"RTMR1_SHA384", 1, crypto.SHA384},
+		{"RTMR2_SHA384", 2, crypto.SHA384},
+		{"RTMR3_SHA384", 3, crypto.SHA384},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			filePath := fmt.Sprintf("/sys/class/misc/tdx_guest/measurements/rtmr%d:sha384", tc.rtmrIndex)
+			digestSize := tc.hashAlgo.Size()
+
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				t.Skipf("skipping test: RTMR sysfs file not found at %s", filePath)
+			}
+
+			for i := 0; i < 10; i++ {
+				initialData, err := os.ReadFile(filePath)
+				if err != nil {
+					t.Fatalf("Round %d: failed to read original digest from %s: %v", i+1, filePath, err)
+				}
+
+				hasher := tc.hashAlgo.New()
+				// Check the size of the initial data before using it.
+				// For a SHA384-based RTMR, the existing data should be a valid SHA384 digest.
+				if len(initialData) != crypto.SHA384.Size() {
+					t.Fatalf("Round %d: initial data from %s has incorrect size: got %d bytes, want %d bytes",
+						i+1, filePath, len(initialData), crypto.SHA384.Size())
+				}
+				hasher.Write(initialData)
+
+				eventDigest := make([]byte, digestSize)
+				if _, err := rand.Read(eventDigest); err != nil {
+					t.Fatalf("Round %d: error generating random data: %v", i+1, err)
+				}
+
+				hasher.Write(eventDigest)
+				wantDigest := hasher.Sum(nil)
+
+				if err := ExtendDigestSysfs(tc.rtmrIndex, eventDigest); err != nil {
+					t.Fatalf("Round %d: error extending RTMR via sysfs: %v", i+1, err)
+				}
+
+				gotDigest, err := os.ReadFile(filePath)
+				if err != nil {
+					t.Fatalf("Round %d: failed to read back from %s for verification: %v", i+1, filePath, err)
+				}
+
+				if !bytes.Equal(wantDigest, gotDigest) {
+					t.Errorf("Round %d: VERIFICATION FAILED:\n  Expected: %s\n  Got:      %s",
+						i+1, hex.EncodeToString(wantDigest), hex.EncodeToString(gotDigest))
+				}
+			}
+		})
 	}
 }
