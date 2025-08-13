@@ -31,6 +31,13 @@ Used to set the verbosity of logger, where higher number means more verbose outp
 
 Default value is `0`.
 
+### `-dev-mode-verify`
+
+This flag enables developer mode to run the RTMR extension verification test suite. This suite performs multiple rounds of measurement extensions and compares 
+the hardware results against software-simulated results to ensure the logic is correct. This flag is intended for debugging and development purposes only. When 
+this flag is used, all other flags are ignored.
+**IMPORTANT**: This operation will pollute the existing RTMR values. To obtain a correct TD Quote after running this command, you **MUST** reboot the VM to reset the RTMRs.
+
 ## Examples
 
 The following example measures an event log and extends its measurement into the RTMR2
