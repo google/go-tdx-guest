@@ -172,12 +172,12 @@ func runRtmrExtensionTestVerification() {
 		fmt.Println("✅ All verification test cases passed.")
 		fmt.Println("=====================================")
 		os.Exit(0)
-	} else {
-		fmt.Println("=====================================")
-		fmt.Println("❌ One or more verification tests FAILED.")
-		fmt.Println("=====================================")
-		os.Exit(1)
 	}
+
+	fmt.Println("=====================================")
+	fmt.Println("❌ One or more verification tests FAILED.")
+	fmt.Println("=====================================")
+	os.Exit(1)
 }
 
 func main() {
