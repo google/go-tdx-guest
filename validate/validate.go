@@ -17,11 +17,15 @@ package validate
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/pem"
+	"errors"
 	"fmt"
 
 	"github.com/google/go-tdx-guest/abi"
+	"github.com/google/go-tdx-guest/pcs"
 	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
@@ -50,6 +54,7 @@ const (
 type Options struct {
 	HeaderOptions      HeaderOptions
 	TdQuoteBodyOptions TdQuoteBodyOptions
+	PCKOptions         PCKOptions
 }
 
 // HeaderOptions represents validation options for a TDX attestation Quote Header.
@@ -86,6 +91,12 @@ type TdQuoteBodyOptions struct {
 	ReportData []byte
 	// MrTd is any permitted MR_TD field. Must be nil or each entry 48 bytes long. Not checked if nil.
 	AnyMrTd [][]byte
+}
+
+// PCKOptions represents validation options for the PCK certificate in side a TDX attestation.
+type PCKOptions struct {
+	// SgxType is the expected SGXType. Not checked if nil.
+	SgxType *pcs.SGXType
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -162,6 +173,10 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
 			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
 		},
+	}
+	if policy.PckPolicy != nil && policy.PckPolicy.SgxType != nil {
+		value := pcs.SGXType(*policy.PckPolicy.SgxType)
+		opts.PCKOptions.SgxType = &value
 	}
 	if err := checkOptionsLengths(opts); err != nil {
 		return nil, err
@@ -315,6 +330,32 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
+func validatePck(quote *pb.QuoteV4, opts *PCKOptions) error {
+	// Extract the PCK
+	certChainBytes := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetPckCertificateChainData().GetPckCertChain()
+	if certChainBytes == nil {
+		return errors.New("PCK certificate chain is empty")
+	}
+	pck, rem := pem.Decode(certChainBytes)
+	if pck == nil || len(rem) == 0 || pck.Type != "CERTIFICATE" {
+		return errors.New("incomplete PCK Certificate chain found, should contain 3 concatenated PEM-formatted 'CERTIFICATE'-type block (PCK Leaf Cert||Intermediate CA Cert||Root CA Cert)")
+	}
+	pckCert, err := x509.ParseCertificate(pck.Bytes)
+	if err != nil {
+		return fmt.Errorf("could not interpret PCK leaf certificate DER bytes: %v", err)
+	}
+
+	// Validate the PCK.
+	exts, err := pcs.PckCertificateExtensions(pckCert)
+	if err != nil {
+		return fmt.Errorf("could not get PCK certificate extensions: %v", err)
+	}
+	if opts.SgxType != nil && *opts.SgxType != exts.SGXType {
+		return fmt.Errorf("PCK extension SGXType is %d. Expect %d", *opts.SgxType, exts.SGXType)
+	}
+	return nil
+}
+
 // TdxQuote validates fields of the protobuf representation of an attestation Quote
 // against expectations depending on supported quote formats - QuoteV4.
 // Does not check the attestation certificates or signature.
@@ -342,6 +383,7 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 		minVersionCheck(quote, options),
 		validateXfam(quote.GetTdQuoteBody().GetXfam(), xfamFixed1, xfamFixed0),
 		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0),
+		validatePck(quote, &options.PCKOptions),
 	)
 }
 

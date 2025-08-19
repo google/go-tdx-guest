@@ -105,6 +105,7 @@ func TestPckCertificateExtensions(t *testing.T) {
 	pckExt.PPID = hex.EncodeToString(ppidBytes)
 	pckExt.FMSPC = hex.EncodeToString(fmspcBytes)
 	pckExt.PCEID = hex.EncodeToString(pceIDBytes)
+	pckExt.SGXType = pcs.SGXTypeScalable
 	pckExtTcb := &pcs.PckCertTCB{
 		PCESvn:           11,
 		CPUSvn:           []byte{3, 3, 2, 2, 2, 1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0},

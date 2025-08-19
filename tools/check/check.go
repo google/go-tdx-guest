@@ -109,6 +109,8 @@ var (
 	minqesvn  = flag.String("minimum_qe_svn", "", "The minimum acceptable value for QE_SVN field.")
 	minpcesvn = flag.String("minimum_pce_svn", "", "The minimum acceptable value for PCE_SVN field.")
 
+	sgxtype = flag.String("sgx_type", "", "An acceptable value for SGXType field.")
+
 	// Optional Bool
 	checkcrl        = flag.String("check_crl", "", "Download and check the CRL for revoked certificates. -get_collateral must be true.")
 	getcollateral   = flag.String("get_collateral", "", "If true, then permitted to download necessary collaterals for additional checks.")
@@ -119,7 +121,7 @@ var (
 	// Assign the values of the flags to the corresponding proto fields
 	config = &ccpb.Config{
 		RootOfTrust: &ccpb.RootOfTrust{},
-		Policy:      &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}},
+		Policy:      &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}},
 	}
 )
 
@@ -232,7 +234,7 @@ func parseConfig(path string) error {
 		config.RootOfTrust = &ccpb.RootOfTrust{}
 	}
 	if config.Policy == nil {
-		config.Policy = &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
+		config.Policy = &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}}
 	}
 	return nil
 }
@@ -355,6 +357,17 @@ func populateConfig() error {
 		}
 		return nil
 	}
+	setSGXType := func(dest **ccpb.SGXType, flag string) error {
+		if flag != "" {
+			val, ok := ccpb.SGXType_value[flag]
+			if !ok {
+				return fmt.Errorf("invalid -sgx_type=%s: expected one of Standard, Scalable, or ScalableWithIntegrity", flag)
+			}
+			sgxType := ccpb.SGXType(val)
+			*dest = &sgxType
+		}
+		return nil
+	}
 
 	setNonNil(&policy.HeaderPolicy.QeVendorId, *qevendorid)
 	setNonNil(&policy.TdQuoteBodyPolicy.MinimumTeeTcbSvn, *minteetcbsvn)
@@ -370,6 +383,7 @@ func populateConfig() error {
 	return multierr.Combine(
 		setUint32(&policy.HeaderPolicy.MinimumQeSvn, "minimum_qe_svn", *minqesvn, defaultMinQeSvn),
 		setUint32(&policy.HeaderPolicy.MinimumPceSvn, "minimum_pce_svn", *minpcesvn, defaultMinPceSvn),
+		setSGXType(&policy.PckPolicy.SgxType, *sgxtype),
 		setRtmrs(&policy.TdQuoteBodyPolicy.Rtmrs, *rtmrs),
 	)
 }

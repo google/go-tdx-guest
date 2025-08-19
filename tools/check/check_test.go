@@ -90,6 +90,11 @@ func setField(p *ccpb.Policy, policy string, name string, value any) {
 		r := s.ProtoReflect()
 		ty := r.Descriptor()
 		r.Set(ty.Fields().ByName(protoreflect.Name(name)), protoreflect.ValueOf(value))
+	} else if policy == "pck_policy" {
+		s := p.PckPolicy
+		r := s.ProtoReflect()
+		ty := r.Descriptor()
+		r.Set(ty.Fields().ByName(protoreflect.Name(name)), protoreflect.ValueOf(value))
 	}
 }
 
@@ -111,6 +116,13 @@ func uint32setter(name string, policy string) setterFn {
 			return true
 		}
 		setField(p, policy, name, uint32(u))
+		return false
+	}
+}
+
+func enumSetter(name string, policy string, values map[string]int32) setterFn {
+	return func(p *ccpb.Policy, value string, _ *testing.T) bool {
+		setField(p, policy, name, protoreflect.EnumNumber(values[value]))
 		return false
 	}
 }
@@ -200,6 +212,16 @@ func testCases() []testCase {
 			bad:    []string{"6c62dec1b8191749a31dab490be532a35944dea47caef1f980863993d9899545eb7406a38d1eed313b987a467dacead6f0c87a6d766c66f6f29f8acb281f2213"},
 			setter: bytesSetter("report_data", "td_quote_body_policy"),
 		},
+		{
+			flag: "sgx_type",
+			good: "Scalable",
+			bad: []string{
+				"Standard",
+				"ScalableWithIntegrity",
+				"non-existing type",
+			},
+			setter: enumSetter("sgx_type", "pck_policy", ccpb.SGXType_value),
+		},
 	}
 }
 
@@ -288,7 +310,7 @@ func TestRtmrs(t *testing.T) {
 func TestCheckGoodFields(t *testing.T) {
 	for _, tc := range testCases() {
 		t.Run(tc.flag, func(t *testing.T) {
-			p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
+			p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}}
 			if tc.setter(p, tc.good, t) {
 				t.Fatal("unexpected parse failure")
 			}
@@ -306,7 +328,7 @@ func TestCheckBadFields(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}}
 				if tc.setter(p, bad, t) {
 					return
 				}
@@ -325,7 +347,7 @@ func TestCheckGoodFlagOverridesBadField(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}}
 				if tc.setter(p, bad, t) {
 					return
 				}
@@ -344,7 +366,7 @@ func TestCheckBadFlagOverridesGoodField(t *testing.T) {
 	for _, tc := range testCases() {
 		for i, bad := range tc.bad {
 			t.Run(fmt.Sprintf("%s_bad[%d]", tc.flag, i+1), func(t *testing.T) {
-				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}}
+				p := &ccpb.Policy{HeaderPolicy: &ccpb.HeaderPolicy{}, TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{}, PckPolicy: &ccpb.PCKPolicy{}}
 				if tc.setter(p, tc.good, t) {
 					t.Fatal("unexpected parse failure")
 				}
