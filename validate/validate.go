@@ -86,6 +86,8 @@ type TdQuoteBodyOptions struct {
 	ReportData []byte
 	// MrTd is any permitted MR_TD field. Must be nil or each entry 48 bytes long. Not checked if nil.
 	AnyMrTd [][]byte
+	// TdAttributesDebug is the expected value of the DEBUG bit (bit 0) in TD_ATTRIBUTES. Not checked if nil.
+	TdAttributesDebug *bool
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -162,6 +164,10 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
 			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
 		},
+	}
+	if policy.GetTdQuoteBodyPolicy() != nil {
+		debugVal := policy.GetTdQuoteBodyPolicy().GetTdattributesDebug()
+		opts.TdQuoteBodyOptions.TdAttributesDebug = &debugVal
 	}
 	if err := checkOptionsLengths(opts); err != nil {
 		return nil, err
@@ -296,7 +302,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
+func validateTdAttributes(value []byte, fixed1, fixed0 uint64, tdAttributesDebug *bool) error {
 	if len(value) == 0 {
 		return nil
 	}
@@ -304,6 +310,14 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
 		return fmt.Errorf("tdAttributes size is invalid")
 	}
 	tdAttributes := binary.LittleEndian.Uint64(value[:])
+
+	if tdAttributesDebug != nil {
+		isDebugSet := (tdAttributes & 0x1) != 0
+		if isDebugSet != *tdAttributesDebug {
+			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is %v, want %v", isDebugSet, *tdAttributesDebug)
+		}
+	}
+
 	logger.V(2).Infof("TdAttributes value is %v, TdAttributesFixed0 value is %v and TdAttributesFixed1 value is %v", tdAttributes, fixed0, fixed1)
 	if tdAttributes&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed1 0x%x bits are unset", tdAttributes, fixed1)
@@ -341,7 +355,7 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
 		validateXfam(quote.GetTdQuoteBody().GetXfam(), xfamFixed1, xfamFixed0),
-		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0),
+		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.TdAttributesDebug),
 	)
 }
 

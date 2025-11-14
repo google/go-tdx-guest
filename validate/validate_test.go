@@ -108,6 +108,9 @@ func TestTdxQuote(t *testing.T) {
 	quoteSample := quoteFn(reportData)
 	quote12345 := quoteFn(nonce12345)
 
+	quote12345WithDebug := quoteFn(nonce12345)
+	quote12345WithDebug.(*pb.QuoteV4).TdQuoteBody.TdAttributes[0] |= 1
+
 	type testCase struct {
 		name    string
 		quote   any
@@ -135,6 +138,7 @@ func TestTdxQuote(t *testing.T) {
 					MrOwnerConfig:    mrOwnerConfig,
 					Rtmrs:            [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
 					ReportData:       reportData,
+					TdAttributesDebug:       func() *bool { b := false; return &b }(),
 				},
 			},
 		},
@@ -281,7 +285,28 @@ func TestTdxQuote(t *testing.T) {
 			opts: &Options{
 				HeaderOptions: HeaderOptions{QeVendorID: make([]byte, abi.QeVendorIDSize)},
 			},
-			wantErr: "quote field QE_VENDOR_ID"},
+			wantErr: "quote field QE_VENDOR_ID",
+		},
+		{
+			name:  "Test unexpected TD_ATTRIBUTES DEBUG bit false",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					TdAttributesDebug: func() *bool { b := true; return &b }(),
+				},
+			},
+			wantErr: "TD_ATTRIBUTES DEBUG bit is false, want true",
+		},
+		{
+			name:  "Test unexpected TD_ATTRIBUTES DEBUG bit true",
+			quote: quote12345WithDebug,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					TdAttributesDebug: func() *bool { b := false; return &b }(),
+				},
+			},
+			wantErr: "TD_ATTRIBUTES DEBUG bit is true, want false",
+		},
 	}
 
 	for _, tc := range tests {
