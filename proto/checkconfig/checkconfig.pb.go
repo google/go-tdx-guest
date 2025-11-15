@@ -179,7 +179,7 @@ type TDQuoteBodyPolicy struct {
 	ReportData       []byte   `protobuf:"bytes,10,opt,name=report_data,json=reportData,proto3" json:"report_data,omitempty"`                      // should be 64 bytes
 	AnyMrTd          [][]byte `protobuf:"bytes,11,rep,name=any_mr_td,json=anyMrTd,proto3" json:"any_mr_td,omitempty"`                             // each should be 48 bytes.
 	// Expected value of the DEBUG bit in td_attributes.
-	TdattributesDebug *bool `protobuf:"varint,12,opt,name=tdattributes_debug,json=tdattributesDebug,proto3,oneof" json:"tdattributes_debug,omitempty"` // Expected value of the DEBUG bit in td_attributes.
+	TdattributesDebug *bool `protobuf:"varint,12,opt,name=tdattributes_debug,json=tdattributesDebug,proto3,oneof" json:"tdattributes_debug,omitempty"`
 }
 
 func (x *TDQuoteBodyPolicy) Reset() {
