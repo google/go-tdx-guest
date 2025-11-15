@@ -53,7 +53,7 @@ message TDQuoteBodyPolicy {
   bytes report_data = 10;         // should be 64 bytes
   repeated bytes any_mr_td = 11;  // each should be 48 bytes.
   // Expected value of the DEBUG bit in td_attributes.
-  optional bool tdattributes_debug = 12;       // Expected value of the DEBUG bit in td_attributes.
+  optional bool tdattributes_debug = 12;
 }
 
 // RootOfTrust represents configuration for which hardware root of trust
