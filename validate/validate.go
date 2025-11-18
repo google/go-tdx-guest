@@ -42,8 +42,9 @@ const (
 	// Supported ATTRIBUTES bits depend on the supported features - bits 0 (DEBUG), 30 (PKS), 63 (PERFMON)
 	// and 28 (SEPT VE DISABLE)
 	// If bit X is 0 in tdAttributesFixed0, it must be 0 in any tdAttributes.
-	tdAttributesFixed0 = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
-	rtmrsCount         = 4
+	tdAttributesFixed0   = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
+	tdAttributesDebugBit = 0x1
+	rtmrsCount           = 4
 )
 
 // Options represents validation options for a TDX attestation Quote.
@@ -165,10 +166,9 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
 		},
 	}
-	if policy.GetTdQuoteBodyPolicy() != nil {
-		debugVal := policy.GetTdQuoteBodyPolicy().GetTdattributesDebug()
-		opts.TdQuoteBodyOptions.TdAttributesDebug = &debugVal
-	}
+	debugVal := policy.GetTdQuoteBodyPolicy().GetTdattributesDebug()
+	opts.TdQuoteBodyOptions.TdAttributesDebug = &debugVal
+
 	if err := checkOptionsLengths(opts); err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	if len(value) != abi.XfamSize {
 		return fmt.Errorf("xfam size is invalid")
 	}
-	xfam := binary.LittleEndian.Uint64(value[:])
+	xfam := binary.LittleEndian.Uint64(value)
 	logger.V(2).Infof("XFAM value is %v, XFAMFixed0 value is %v and XFAMFixed1 value is %v", xfam, fixed0, fixed1)
 	if xfam&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized xfam 0x%x as xfamFixed1 0x%x bits are unset", xfam, fixed1)
@@ -302,19 +302,19 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-func validateTdAttributes(value []byte, fixed1, fixed0 uint64, tdAttributesDebug *bool) error {
+func validateTdAttributes(value []byte, fixed1, fixed0 uint64, wantTdAttributesDebug *bool) error {
 	if len(value) == 0 {
 		return nil
 	}
 	if len(value) != abi.TdAttributesSize {
 		return fmt.Errorf("tdAttributes size is invalid")
 	}
-	tdAttributes := binary.LittleEndian.Uint64(value[:])
+	tdAttributes := binary.LittleEndian.Uint64(value)
 
-	if tdAttributesDebug != nil {
-		isDebugSet := (tdAttributes & 0x1) != 0
-		if isDebugSet != *tdAttributesDebug {
-			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is %v, want %v", isDebugSet, *tdAttributesDebug)
+	if wantTdAttributesDebug != nil {
+		isDebugSet := (tdAttributes & tdAttributesDebugBit) == tdAttributesDebugBit
+		if isDebugSet != *wantTdAttributesDebug {
+			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is %v, want %v", isDebugSet, *wantTdAttributesDebug)
 		}
 	}
 
