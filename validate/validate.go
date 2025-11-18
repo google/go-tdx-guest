@@ -87,9 +87,9 @@ type TdQuoteBodyOptions struct {
 	ReportData []byte
 	// MrTd is any permitted MR_TD field. Must be nil or each entry 48 bytes long. Not checked if nil.
 	AnyMrTd [][]byte
-	// AllowDebug determines whether the DEBUG bit (bit 0) in TD_ATTRIBUTES is allowed to be set.
-	// If false, the DEBUG bit must be 0.
-	AllowDebug bool
+	// EnableTdDebugCheck determines whether the DEBUG bit (bit 0) in TD_ATTRIBUTES is checked.
+	// If true, the DEBUG bit must be 0. If false, the DEBUG bit is not checked.
+	EnableTdDebugCheck bool
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -154,18 +154,18 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			QeVendorID:    policy.GetHeaderPolicy().GetQeVendorId(),
 		},
 		TdQuoteBodyOptions: TdQuoteBodyOptions{
-			MinimumTeeTcbSvn: policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
-			MrSeam:           policy.GetTdQuoteBodyPolicy().GetMrSeam(),
-			TdAttributes:     policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
-			Xfam:             policy.GetTdQuoteBodyPolicy().GetXfam(),
-			MrTd:             policy.GetTdQuoteBodyPolicy().GetMrTd(),
-			MrConfigID:       policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
-			MrOwner:          policy.GetTdQuoteBodyPolicy().GetMrOwner(),
-			MrOwnerConfig:    policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
-			Rtmrs:            policy.GetTdQuoteBodyPolicy().GetRtmrs(),
-			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
-			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
-			AllowDebug:       policy.GetTdQuoteBodyPolicy().GetAllowDebug(),
+			MinimumTeeTcbSvn:   policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
+			MrSeam:             policy.GetTdQuoteBodyPolicy().GetMrSeam(),
+			TdAttributes:       policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
+			Xfam:               policy.GetTdQuoteBodyPolicy().GetXfam(),
+			MrTd:               policy.GetTdQuoteBodyPolicy().GetMrTd(),
+			MrConfigID:         policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
+			MrOwner:            policy.GetTdQuoteBodyPolicy().GetMrOwner(),
+			MrOwnerConfig:      policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
+			Rtmrs:              policy.GetTdQuoteBodyPolicy().GetRtmrs(),
+			ReportData:         policy.GetTdQuoteBodyPolicy().GetReportData(),
+			AnyMrTd:            policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
+			EnableTdDebugCheck: policy.GetTdQuoteBodyPolicy().GetEnableTdDebugCheck(),
 		},
 	}
 
@@ -302,7 +302,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-func validateTdAttributes(value []byte, fixed1, fixed0 uint64, allowDebug bool) error {
+func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugCheck bool) error {
 	if len(value) == 0 {
 		return nil
 	}
@@ -311,7 +311,7 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64, allowDebug bool) 
 	}
 	tdAttributes := binary.LittleEndian.Uint64(value)
 
-	if !allowDebug {
+	if enableTdDebugCheck {
 		if (tdAttributes & tdAttributesDebugBit) != 0 {
 			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed")
 		}
@@ -354,7 +354,7 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
 		validateXfam(quote.GetTdQuoteBody().GetXfam(), xfamFixed1, xfamFixed0),
-		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.AllowDebug),
+		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck),
 	)
 }
 
