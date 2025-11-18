@@ -138,7 +138,7 @@ func TestTdxQuote(t *testing.T) {
 					MrOwnerConfig:     mrOwnerConfig,
 					Rtmrs:             [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
 					ReportData:        reportData,
-					TdAttributesDebug: func() *bool { b := false; return &b }(),
+					AllowDebug:        false,
 				},
 			},
 		},
@@ -288,24 +288,12 @@ func TestTdxQuote(t *testing.T) {
 			wantErr: "quote field QE_VENDOR_ID",
 		},
 		{
-			name:  "Test unexpected TD_ATTRIBUTES DEBUG bit false",
-			quote: quote12345,
-			opts: &Options{
-				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					TdAttributesDebug: func() *bool { b := true; return &b }(),
-				},
-			},
-			wantErr: "TD_ATTRIBUTES DEBUG bit is false, want true",
-		},
-		{
-			name:  "Test unexpected TD_ATTRIBUTES DEBUG bit true",
+			name:  "Test disallowed TD_ATTRIBUTES DEBUG bit set",
 			quote: quote12345WithDebug,
 			opts: &Options{
-				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					TdAttributesDebug: func() *bool { b := false; return &b }(),
-				},
+				TdQuoteBodyOptions: TdQuoteBodyOptions{},
 			},
-			wantErr: "TD_ATTRIBUTES DEBUG bit is true, want false",
+			wantErr: "TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed",
 		},
 	}
 

@@ -52,7 +52,7 @@ message TDQuoteBodyPolicy {
   repeated bytes rtmrs = 9;       // should be 48 * rtmrsCount
   bytes report_data = 10;         // should be 64 bytes
   repeated bytes any_mr_td = 11;  // each should be 48 bytes.
-  bool tdattributes_debug = 12;   // expected DEBUG enablement in TDAttributes.
+  bool allow_debug = 12;          // if true, allows DEBUG bit to be set in TDAttributes.
 }
 
 // RootOfTrust represents configuration for which hardware root of trust
