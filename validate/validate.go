@@ -42,8 +42,9 @@ const (
 	// Supported ATTRIBUTES bits depend on the supported features - bits 0 (DEBUG), 30 (PKS), 63 (PERFMON)
 	// and 28 (SEPT VE DISABLE)
 	// If bit X is 0 in tdAttributesFixed0, it must be 0 in any tdAttributes.
-	tdAttributesFixed0 = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
-	rtmrsCount         = 4
+	tdAttributesFixed0   = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
+	tdAttributesDebugBit = 0x1
+	rtmrsCount           = 4
 )
 
 // Options represents validation options for a TDX attestation Quote.
@@ -86,6 +87,9 @@ type TdQuoteBodyOptions struct {
 	ReportData []byte
 	// MrTd is any permitted MR_TD field. Must be nil or each entry 48 bytes long. Not checked if nil.
 	AnyMrTd [][]byte
+	// EnableTdDebugCheck determines whether the DEBUG bit (bit 0) in TD_ATTRIBUTES is checked.
+	// If true, the DEBUG bit must be 0. If false, the DEBUG bit is not checked.
+	EnableTdDebugCheck bool
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -150,19 +154,21 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			QeVendorID:    policy.GetHeaderPolicy().GetQeVendorId(),
 		},
 		TdQuoteBodyOptions: TdQuoteBodyOptions{
-			MinimumTeeTcbSvn: policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
-			MrSeam:           policy.GetTdQuoteBodyPolicy().GetMrSeam(),
-			TdAttributes:     policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
-			Xfam:             policy.GetTdQuoteBodyPolicy().GetXfam(),
-			MrTd:             policy.GetTdQuoteBodyPolicy().GetMrTd(),
-			MrConfigID:       policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
-			MrOwner:          policy.GetTdQuoteBodyPolicy().GetMrOwner(),
-			MrOwnerConfig:    policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
-			Rtmrs:            policy.GetTdQuoteBodyPolicy().GetRtmrs(),
-			ReportData:       policy.GetTdQuoteBodyPolicy().GetReportData(),
-			AnyMrTd:          policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
+			MinimumTeeTcbSvn:   policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
+			MrSeam:             policy.GetTdQuoteBodyPolicy().GetMrSeam(),
+			TdAttributes:       policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
+			Xfam:               policy.GetTdQuoteBodyPolicy().GetXfam(),
+			MrTd:               policy.GetTdQuoteBodyPolicy().GetMrTd(),
+			MrConfigID:         policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
+			MrOwner:            policy.GetTdQuoteBodyPolicy().GetMrOwner(),
+			MrOwnerConfig:      policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
+			Rtmrs:              policy.GetTdQuoteBodyPolicy().GetRtmrs(),
+			ReportData:         policy.GetTdQuoteBodyPolicy().GetReportData(),
+			AnyMrTd:            policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
+			EnableTdDebugCheck: policy.GetTdQuoteBodyPolicy().GetEnableTdDebugCheck(),
 		},
 	}
+
 	if err := checkOptionsLengths(opts); err != nil {
 		return nil, err
 	}
@@ -284,7 +290,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	if len(value) != abi.XfamSize {
 		return fmt.Errorf("xfam size is invalid")
 	}
-	xfam := binary.LittleEndian.Uint64(value[:])
+	xfam := binary.LittleEndian.Uint64(value)
 	logger.V(2).Infof("XFAM value is %v, XFAMFixed0 value is %v and XFAMFixed1 value is %v", xfam, fixed0, fixed1)
 	if xfam&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized xfam 0x%x as xfamFixed1 0x%x bits are unset", xfam, fixed1)
@@ -296,14 +302,21 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-func validateTdAttributes(value []byte, fixed1, fixed0 uint64) error {
+func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugCheck bool) error {
 	if len(value) == 0 {
 		return nil
 	}
 	if len(value) != abi.TdAttributesSize {
 		return fmt.Errorf("tdAttributes size is invalid")
 	}
-	tdAttributes := binary.LittleEndian.Uint64(value[:])
+	tdAttributes := binary.LittleEndian.Uint64(value)
+
+	if enableTdDebugCheck {
+		if (tdAttributes & tdAttributesDebugBit) != 0 {
+			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed")
+		}
+	}
+
 	logger.V(2).Infof("TdAttributes value is %v, TdAttributesFixed0 value is %v and TdAttributesFixed1 value is %v", tdAttributes, fixed0, fixed1)
 	if tdAttributes&fixed1 != fixed1 {
 		return fmt.Errorf("unauthorized tdAttributes 0x%x as tdAttributesFixed1 0x%x bits are unset", tdAttributes, fixed1)
@@ -341,7 +354,7 @@ func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
 		validateXfam(quote.GetTdQuoteBody().GetXfam(), xfamFixed1, xfamFixed0),
-		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0),
+		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck),
 	)
 }
 

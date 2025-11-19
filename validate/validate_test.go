@@ -108,6 +108,9 @@ func TestTdxQuote(t *testing.T) {
 	quoteSample := quoteFn(reportData)
 	quote12345 := quoteFn(nonce12345)
 
+	quote12345WithDebug := quoteFn(nonce12345)
+	quote12345WithDebug.(*pb.QuoteV4).TdQuoteBody.TdAttributes[0] |= 1
+
 	type testCase struct {
 		name    string
 		quote   any
@@ -125,16 +128,17 @@ func TestTdxQuote(t *testing.T) {
 					QeVendorID:    qeVendorID,
 				},
 				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					MinimumTeeTcbSvn: teeTcbSvn,
-					MrSeam:           mrSeam,
-					TdAttributes:     tdAttributes,
-					Xfam:             xfam,
-					MrTd:             mrTd,
-					MrConfigID:       mrConfigID,
-					MrOwner:          mrOwner,
-					MrOwnerConfig:    mrOwnerConfig,
-					Rtmrs:            [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
-					ReportData:       reportData,
+					MinimumTeeTcbSvn:   teeTcbSvn,
+					MrSeam:             mrSeam,
+					TdAttributes:       tdAttributes,
+					Xfam:               xfam,
+					MrTd:               mrTd,
+					MrConfigID:         mrConfigID,
+					MrOwner:            mrOwner,
+					MrOwnerConfig:      mrOwnerConfig,
+					Rtmrs:              [][]byte{rtmr0, rtmr1, rtmr2, rtmr3},
+					ReportData:         reportData,
+					EnableTdDebugCheck: true,
 				},
 			},
 		},
@@ -281,7 +285,16 @@ func TestTdxQuote(t *testing.T) {
 			opts: &Options{
 				HeaderOptions: HeaderOptions{QeVendorID: make([]byte, abi.QeVendorIDSize)},
 			},
-			wantErr: "quote field QE_VENDOR_ID"},
+			wantErr: "quote field QE_VENDOR_ID",
+		},
+		{
+			name:  "Test disallowed TD_ATTRIBUTES DEBUG bit set",
+			quote: quote12345WithDebug,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{EnableTdDebugCheck: true},
+			},
+			wantErr: "TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed",
+		},
 	}
 
 	for _, tc := range tests {
