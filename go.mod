@@ -9,8 +9,8 @@ require (
 	github.com/google/go-sev-guest v0.8.0
 	github.com/google/logger v1.1.1
 	go.uber.org/multierr v1.11.0
-	golang.org/x/crypto v0.17.0
-	golang.org/x/sys v0.19.0
+	golang.org/x/crypto v0.31.0
+	golang.org/x/sys v0.28.0
 	google.golang.org/protobuf v1.34.2
 )
 
