@@ -16,23 +16,90 @@ package abi
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	test "github.com/google/go-tdx-guest/testing/testdata"
 )
 
+// TODO: Use errors.Is() instead of string comparisons
 func TestQuoteToProto(t *testing.T) {
-	expectedError := "unable to determine quote format since bytes length is less than 2 bytes"
-	var emptyRawQuote []uint8
-	_, err := QuoteToProto(emptyRawQuote)
-	if err == nil || err.Error() != expectedError {
-		t.Errorf("error found: %v, want error: %s", err, expectedError)
+	clone := func(b []byte) []byte {
+		c := make([]byte, len(b))
+		copy(c, b)
+		return c
+	}
+	tcs := []struct {
+		name     string
+		rawQuote []byte
+		wantErr  string
+	}{
+		{
+			name:     "empty quote",
+			rawQuote: []byte{},
+			wantErr:  ErrRawQuoteEmpty.Error(),
+		},
+		{
+			name:     "v4 quote",
+			rawQuote: test.RawQuote,
+			wantErr:  "",
+		},
+		{
+			name:     "v5 quote",
+			rawQuote: test.RawQuoteV5,
+			wantErr:  "",
+		},
+		{
+			name:     "v5 quote too small",
+			rawQuote: test.RawQuoteV5[:100],
+			wantErr:  "raw quote size is 100 bytes, a V5 TDX quote should have size a minimum size of 1026 bytes", // QuoteMinSizeV5
+		},
+		{
+			name: "v5 quote unsupported body type",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuoteV5)
+				q[quoteBodyStart] = 1 // TdQuoteBodyType = 1, little-endian uint16
+				q[quoteBodyStart+1] = 0
+				return q
+			}(),
+			wantErr: "parsing TD Quote Body Descriptor failed: unsupported TD quote body type , got 1",
+		},
+		{
+			name: "v5 quote body size too large",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuoteV5)
+				// modify the body size to be larger than expected (648)
+				quoteBodySizeBytes := quoteHeaderSizeV5 + quoteBodyTypeSizeV5
+				binary.LittleEndian.PutUint32(q[quoteBodySizeBytes:], uint32(999))
+				return q
+			}(),
+			wantErr: "TD quote body size is 999, a V5 TDX1.5 quote should have size 648",
+		},
+		{
+			name: "incorrect TDX version",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuoteV5)
+				binary.LittleEndian.PutUint16(q[quoteHeaderSizeV5:quoteHeaderSizeV5+quoteBodyTypeSizeV5], uint16(2))
+				return q
+			}(),
+			wantErr: "TD quote body size is 648, a V5 TDX1.0 quote should have size 584",
+		},
 	}
 
-	_, err = QuoteToProto(test.RawQuote)
-	if err != nil {
-		t.Fatal(err)
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := QuoteToProto(tc.rawQuote)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Errorf("QuoteToProto() returned error %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tc.wantErr {
+				t.Errorf("QuoteToProto() returned error %v, want %v", err, tc.wantErr)
+			}
+		})
 	}
 }
 
@@ -140,10 +207,10 @@ func TestInvalidConversionsToAbiBytes(t *testing.T) {
 	if _, err := HeaderToAbiBytes(&pb.Header{Version: 1}); err == nil || err.Error() != expectedErrors[12] {
 		t.Errorf("error found: %v, want error: %s", err, expectedErrors[12])
 	}
-	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersion, AttestationKeyType: 1}); err == nil || err.Error() != expectedErrors[13] {
+	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: 1}); err == nil || err.Error() != expectedErrors[13] {
 		t.Errorf("error found: %v, want error: %s", err, expectedErrors[13])
 	}
-	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersion, AttestationKeyType: AttestationKeyType, TeeType: 0x01}); err == nil || err.Error() != expectedErrors[14] {
+	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: AttestationKeyType, TeeType: 0x01}); err == nil || err.Error() != expectedErrors[14] {
 		t.Errorf("error found: %v, want error: %s", err, expectedErrors[14])
 	}
 	if _, err := EnclaveReportToAbiBytes(&pb.EnclaveReport{}); err == nil || err.Error() != expectedErrors[15] {

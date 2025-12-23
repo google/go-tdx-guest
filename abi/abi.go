@@ -30,8 +30,8 @@ import (
 const (
 	// QuoteMinSize is the minimum specified size of TDX generated quote
 	QuoteMinSize = 0x3FC
-	// QuoteVersion currently in support
-	QuoteVersion = 4
+	// QuoteVersionV4 is the version4 of the quote currently in support
+	QuoteVersionV4 = 4
 	// AttestationKeyType supported value
 	AttestationKeyType = 2 // (ECDSA-256-with-P-256 curve)
 	// TeeTDX  for Attestation
@@ -178,6 +178,41 @@ const (
 	pckCertChainSizeEnd                     = 0x06
 	pckCertChainDataStart                   = pckCertChainSizeEnd
 	rtmrsCount                              = 4
+	// V5 constants
+	intelQuoteV5Version         = 5
+	quoteHeaderSizeV5           = 48
+	quoteBodyTypeSizeV5         = 2
+	quoteBodySizeFieldLengthV5  = 4
+	teeTcbSvnSizeV5             = 16
+	mrSeamSizeV5                = 48
+	mrSignerSeamSizeV5          = 48
+	seamAttributesSizeV5        = 8
+	tdAttributesSizeV5          = 8
+	xFamSizeV5                  = 8
+	mrTdSizeV5                  = 48
+	mrConfigIDSizeV5            = 48
+	mrOwnerSizeV5               = 48
+	mrOwnerConfigSizeV5         = 48
+	rtmrsTotalSizeV5            = 192
+	rtmrsCountV5                = 4
+	rtmrsSizeV5                 = 48
+	reportDataSizeV5            = 64
+	teeTcbSvn2SizeV5            = 16
+	mrServiceTdSizeV5           = 48
+	tdQuoteBodySizeV5TDX10      = 584
+	tdQuoteBodySizeV5TDX15      = 648
+	tdxVersion10BodyType        = 2
+	tdxVersion15BodyType        = 3
+	signedDataSizeFieldLengthV5 = 4
+
+	// QuoteMinSizeV5 is the minimum specified size of TDX generated quote in case of version 5
+	QuoteMinSizeV5 = 1026
+	// TeeTcbSvn2SizeV5 is the size of TeeTcbSvn2 field in TDQuoteBodyV5
+	TeeTcbSvn2SizeV5 = 16
+	// MrServiceTdSizeV5 is the size of MrServiceTd field in TDQuoteBodyV5
+	MrServiceTdSizeV5 = 48
+	// QuoteVersionV5 is the version of the quote in case of version 5 of quote format
+	QuoteVersionV5 = 5
 )
 
 var (
@@ -216,6 +251,13 @@ var (
 
 	// ErrHeaderNil error returned when header is nil
 	ErrHeaderNil = errors.New("header is nil")
+
+	// ErrQuoteV5Nil error returned when QuoteV5 is nil
+	ErrQuoteV5Nil = errors.New("QuoteV5 is nil")
+	// ErrTDQuoteBodyDescriptorNil error returned when TD quote body descriptor is nil
+	ErrTDQuoteBodyDescriptorNil = errors.New("TD quote body descriptor is nil")
+	// ErrRawQuoteEmpty error returned when raw quote is empty
+	ErrRawQuoteEmpty = errors.New("raw quote is empty")
 )
 
 func clone(b []byte) []byte {
@@ -238,6 +280,9 @@ func determineQuoteFormat(b []uint8) (uint32, error) {
 // QuoteToProto creates a Quote from the Intel's attestation quote byte array in Intel's ABI format.
 // Supported quote formats - QuoteV4.
 func QuoteToProto(b []uint8) (any, error) {
+	if len(b) == 0 {
+		return nil, ErrRawQuoteEmpty
+	}
 	quoteFormat, err := determineQuoteFormat(b)
 	if err != nil {
 		return nil, err
@@ -245,6 +290,8 @@ func QuoteToProto(b []uint8) (any, error) {
 	switch quoteFormat {
 	case intelQuoteV4Version:
 		return quoteToProtoV4(b)
+	case intelQuoteV5Version:
+		return quoteToProtoV5(b)
 	default:
 		return nil, fmt.Errorf("quote format not supported")
 	}
@@ -294,11 +341,67 @@ func quoteToProtoV4(b []uint8) (*pb.QuoteV4, error) {
 	return quote, nil
 }
 
+func quoteToProtoV5(b []uint8) (*pb.QuoteV5, error) {
+	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < QuoteMinSizeV5 {
+		return nil, fmt.Errorf("raw quote size is %d bytes, a V5 TDX quote should have size a minimum size of %d bytes", len(data), QuoteMinSizeV5)
+	}
+	quote := &pb.QuoteV5{}
+
+	// maintains current parsed length of quote
+	var offset int32
+
+	header, err := headerToProto(data[offset:quoteHeaderSizeV5])
+	if err != nil {
+		return nil, err
+	}
+	offset = quoteHeaderSizeV5
+
+	tdQuoteBodyDescriptor, bodyDescriptorSizeV5, err := tdQuoteBodyDescriptorToProto(data[offset:])
+	if err != nil {
+		return nil, err
+	}
+	offset += bodyDescriptorSizeV5
+
+	signedDataSizeV5 := int32(binary.LittleEndian.Uint32(data[offset : offset+signedDataSizeFieldLengthV5]))
+	offset += signedDataSizeFieldLengthV5
+
+	additionalData := data[offset:]
+	if int32(len(additionalData)) < signedDataSizeV5 {
+		return nil, fmt.Errorf("size of signed data is 0x%x. Expected minimum size of 0x%x", len(additionalData), signedDataSizeV5)
+	}
+
+	signedDataV5, err := signedDataToProto(data[offset : offset+signedDataSizeV5])
+	if err != nil {
+		return nil, err
+	}
+
+	offset += signedDataSizeV5
+	extraBytes := data[offset:]
+
+	quote.Header = header
+	quote.TdQuoteBodyDescriptor = tdQuoteBodyDescriptor
+	quote.SignedDataSize = signedDataSizeV5
+	quote.SignedData = signedDataV5
+
+	if len(extraBytes) > 0 {
+		quote.ExtraBytes = extraBytes
+	}
+	if err := CheckQuoteV5(quote); err != nil {
+		return nil, fmt.Errorf("parsing QuoteV5 failed: %v", err)
+	}
+	return quote, nil
+}
+
 func headerToProto(b []uint8) (*pb.Header, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
 	header := &pb.Header{}
 
-	header.Version = uint32(binary.LittleEndian.Uint16(data[headerVersionStart:headerVersionEnd]))
+	quoteVersion := uint32(binary.LittleEndian.Uint16(data[headerVersionStart:headerVersionEnd]))
+	header.Version = quoteVersion
+	if quoteVersion != QuoteVersionV4 && quoteVersion != QuoteVersionV5 {
+		return nil, fmt.Errorf("quote version %d not supported", quoteVersion)
+	}
 	header.AttestationKeyType = uint32(binary.LittleEndian.Uint16(data[headerAttestationKeyTypeStart:headerAttestationKeyTypeEnd]))
 	header.TeeType = binary.LittleEndian.Uint32(data[headerTeeTypeStart:headerTeeTypeEnd])
 	header.PceSvn = data[headerPceSvnStart:headerPceSvnEnd]
@@ -306,7 +409,7 @@ func headerToProto(b []uint8) (*pb.Header, error) {
 	header.QeVendorId = data[headerQeVendorIDStart:headerQeVendorIDEnd]
 	header.UserData = data[headerUserDataStart:headerUserDataEnd]
 
-	if err := checkHeader(header); err != nil {
+	if err := checkHeader(header, quoteVersion); err != nil {
 		return nil, fmt.Errorf("parsing header failed: %v", err)
 	}
 	return header, nil
@@ -339,6 +442,74 @@ func tdQuoteBodyToProto(b []uint8) (*pb.TDQuoteBody, error) {
 	}
 
 	return report, nil
+}
+
+func tdQuoteBodyDescriptorToProto(b []uint8) (*pb.TDQuoteBodyDescriptor, int32, error) {
+
+	data := clone(b) // Created an independent copy to make the interface less error-prone
+	var offset int32
+
+	tdQuoteBodyDescriptor := &pb.TDQuoteBodyDescriptor{}
+	tdQuoteBodyV5 := &pb.TDQuoteBodyV5{}
+	tdQuoteBodyDescriptor.TdQuoteBodyType = int32(binary.LittleEndian.Uint16(data[offset : offset+quoteBodyTypeSizeV5]))
+	offset += quoteBodyTypeSizeV5
+	tdQuoteBodyDescriptor.TdQuoteBodySize = int32(binary.LittleEndian.Uint32(data[offset : offset+quoteBodySizeFieldLengthV5]))
+	if tdQuoteBodyDescriptor.TdQuoteBodyType == tdxVersion10BodyType && tdQuoteBodyDescriptor.TdQuoteBodySize != tdQuoteBodySizeV5TDX10 {
+		return nil, 0, fmt.Errorf("TD quote body size is %d, a V5 TDX1.0 quote should have size %d", tdQuoteBodyDescriptor.TdQuoteBodySize, tdQuoteBodySizeV5TDX10)
+	}
+	if tdQuoteBodyDescriptor.TdQuoteBodyType == tdxVersion15BodyType && tdQuoteBodyDescriptor.TdQuoteBodySize != tdQuoteBodySizeV5TDX15 {
+		return nil, 0, fmt.Errorf("TD quote body size is %d, a V5 TDX1.5 quote should have size %d", tdQuoteBodyDescriptor.TdQuoteBodySize, tdQuoteBodySizeV5TDX15)
+	}
+	offset += quoteBodySizeFieldLengthV5
+	tdQuoteBodyV5.TeeTcbSvn = data[offset : offset+teeTcbSvnSizeV5]
+	offset += teeTcbSvnSizeV5
+	tdQuoteBodyV5.MrSeam = data[offset : offset+mrSeamSizeV5]
+	offset += mrSeamSizeV5
+	tdQuoteBodyV5.MrSignerSeam = data[offset : offset+mrSignerSeamSizeV5]
+	offset += mrSignerSeamSizeV5
+	tdQuoteBodyV5.SeamAttributes = data[offset : offset+seamAttributesSizeV5]
+	offset += seamAttributesSizeV5
+	tdQuoteBodyV5.TdAttributes = data[offset : offset+tdAttributesSizeV5]
+	offset += tdAttributesSizeV5
+	tdQuoteBodyV5.Xfam = data[offset : offset+xFamSizeV5]
+	offset += xFamSizeV5
+	tdQuoteBodyV5.MrTd = data[offset : offset+mrTdSizeV5]
+	offset += mrTdSizeV5
+	tdQuoteBodyV5.MrConfigId = data[offset : offset+mrConfigIDSizeV5]
+	offset += mrConfigIDSizeV5
+	tdQuoteBodyV5.MrOwner = data[offset : offset+mrOwnerSizeV5]
+	offset += mrOwnerSizeV5
+	tdQuoteBodyV5.MrOwnerConfig = data[offset : offset+mrOwnerConfigSizeV5]
+	offset += mrOwnerConfigSizeV5
+
+	for i := 0; i < rtmrsCountV5; i++ {
+		arr := data[offset : offset+rtmrsSizeV5]
+		offset += rtmrsSizeV5
+		tdQuoteBodyV5.Rtmrs = append(tdQuoteBodyV5.Rtmrs, arr)
+	}
+	tdQuoteBodyV5.ReportData = data[offset : offset+reportDataSizeV5]
+	offset += reportDataSizeV5
+
+	switch tdQuoteBodyDescriptor.TdQuoteBodyType {
+	// 3 is the body type when TDX1.5 is present, and 2 when TDX1.0.
+	case tdxVersion15BodyType:
+		tdQuoteBodyV5.TeeTcbSvn2 = data[offset : offset+teeTcbSvn2SizeV5]
+		offset += teeTcbSvn2SizeV5
+		tdQuoteBodyV5.MrServiceTd = data[offset : offset+mrServiceTdSizeV5]
+		offset += mrServiceTdSizeV5
+	default:
+		tdQuoteBodyV5.TeeTcbSvn2 = nil
+		tdQuoteBodyV5.MrServiceTd = nil
+	}
+
+	tdQuoteBodyDescriptor.TdQuoteBodyV5 = tdQuoteBodyV5
+
+	err := checkTDQuoteBodyDescriptor(tdQuoteBodyDescriptor)
+	if err != nil {
+		return nil, 0, fmt.Errorf("parsing TD Quote Body Descriptor failed: %v", err)
+	}
+
+	return tdQuoteBodyDescriptor, offset, nil
 }
 
 func signedDataToProto(b []uint8) (*pb.Ecdsa256BitQuoteV4AuthData, error) {
@@ -468,14 +639,14 @@ func pckCertificateChainToProto(b []uint8) (*pb.PCKCertificateChainData, error) 
 	return pckCertificateChain, nil
 }
 
-func checkHeader(header *pb.Header) error {
+func checkHeader(header *pb.Header, quoteVersion uint32) error {
 	if header == nil {
 		return ErrHeaderNil
 	}
 	if header.GetVersion() >= (1 << 16) {
 		return fmt.Errorf("version field size must fit in 2 bytes , got %d", header.GetVersion())
 	}
-	if header.GetVersion() != QuoteVersion {
+	if header.GetVersion() != quoteVersion {
 		return fmt.Errorf("version %d not supported", header.GetVersion())
 	}
 	if header.GetAttestationKeyType() >= (1 << 16) {
@@ -546,6 +717,57 @@ func checkTDQuoteBody(tdQuoteBody *pb.TDQuoteBody) error {
 		if len(tdQuoteBody.GetRtmrs()[i]) != RtmrSize {
 			return fmt.Errorf("rtmr%d size is %d bytes. Expected %d bytes", i, len(tdQuoteBody.GetRtmrs()[i]), RtmrSize)
 		}
+	}
+	if len(tdQuoteBody.GetReportData()) != ReportDataSize {
+		return fmt.Errorf("report data size is %d bytes. Expected %d bytes", len(tdQuoteBody.GetReportData()), ReportDataSize)
+	}
+	return nil
+}
+
+// getCommonFieldsFromV5 retrieves common fields from quote V5 and V4 and places in quoteBodyV4
+func getCommonFieldsFromV5(tdQuoteBodyV5 *pb.TDQuoteBodyV5) *pb.TDQuoteBody {
+	tdQuoteBody := &pb.TDQuoteBody{
+		TeeTcbSvn:      tdQuoteBodyV5.GetTeeTcbSvn(),
+		MrSeam:         tdQuoteBodyV5.GetMrSeam(),
+		MrSignerSeam:   tdQuoteBodyV5.GetMrSignerSeam(),
+		SeamAttributes: tdQuoteBodyV5.GetSeamAttributes(),
+		TdAttributes:   tdQuoteBodyV5.GetTdAttributes(),
+		Xfam:           tdQuoteBodyV5.GetXfam(),
+		MrTd:           tdQuoteBodyV5.GetMrTd(),
+		MrConfigId:     tdQuoteBodyV5.GetMrConfigId(),
+		MrOwner:        tdQuoteBodyV5.GetMrOwner(),
+		MrOwnerConfig:  tdQuoteBodyV5.GetMrOwnerConfig(),
+		Rtmrs:          tdQuoteBodyV5.GetRtmrs(),
+		ReportData:     tdQuoteBodyV5.GetReportData(),
+	}
+	return tdQuoteBody
+}
+
+func checkTDQuoteBodyV5(tdQuoteBodyV5 *pb.TDQuoteBodyV5, tdxVersion int32) error {
+	if tdxVersion != tdxVersion10BodyType && tdxVersion != tdxVersion15BodyType {
+		return fmt.Errorf("tdx version %d is not supported", tdxVersion)
+	}
+	// V4 quote body and V5 quote body have same TD quote body fields.
+	// So, we can copy V5 quote body to V4 quote body and check the V4 quote body.
+	if err := checkTDQuoteBody(getCommonFieldsFromV5(tdQuoteBodyV5)); err != nil {
+		return err
+	}
+	// TDX1.0 does not have teeTcbSvn2 and mrServiceTd fields.
+	if tdxVersion == tdxVersion10BodyType {
+		if len(tdQuoteBodyV5.GetTeeTcbSvn2()) != 0 {
+			return fmt.Errorf("teeTcbSvn2 is not expected to be set for TDX version 1.0")
+		}
+		if len(tdQuoteBodyV5.GetMrServiceTd()) != 0 {
+			return fmt.Errorf("mrServiceTd are not expected to be set for TDX version 1.0")
+		}
+		return nil
+	}
+	// TDX1.5 has teeTcbSvn2 and mrServiceTd fields.
+	if len(tdQuoteBodyV5.GetTeeTcbSvn2()) != TeeTcbSvn2SizeV5 {
+		return fmt.Errorf("teeTcbSvn2 size is %d bytes. Expected %d bytes", len(tdQuoteBodyV5.GetTeeTcbSvn2()), TeeTcbSvn2SizeV5)
+	}
+	if len(tdQuoteBodyV5.GetMrServiceTd()) != MrServiceTdSizeV5 {
+		return fmt.Errorf("mrServiceTd size is %d bytes. Expected %d bytes", len(tdQuoteBodyV5.GetMrServiceTd()), MrServiceTdSizeV5)
 	}
 	return nil
 }
@@ -667,7 +889,6 @@ func checkEcdsa256BitQuoteV4AuthData(signedData *pb.Ecdsa256BitQuoteV4AuthData) 
 	if err := checkCertificationData(signedData.GetCertificationData()); err != nil {
 		return fmt.Errorf("certification data error: %v", err)
 	}
-
 	return nil
 }
 
@@ -676,7 +897,7 @@ func CheckQuoteV4(quote *pb.QuoteV4) error {
 	if quote == nil {
 		return ErrQuoteV4Nil
 	}
-	if err := checkHeader(quote.GetHeader()); err != nil {
+	if err := checkHeader(quote.GetHeader(), QuoteVersionV4); err != nil {
 		return fmt.Errorf("QuoteV4 Header error: %v", err)
 	}
 	if err := checkTDQuoteBody(quote.GetTdQuoteBody()); err != nil {
@@ -685,6 +906,54 @@ func CheckQuoteV4(quote *pb.QuoteV4) error {
 
 	if err := checkEcdsa256BitQuoteV4AuthData(quote.GetSignedData()); err != nil {
 		return fmt.Errorf("QuoteV4 AuthData error: %v", err)
+	}
+	return nil
+}
+
+// CheckQuoteV5 validates a QuoteV5 protobuf by ensuring all parameters meet their required size
+func CheckQuoteV5(quote *pb.QuoteV5) error {
+	if quote == nil {
+		return ErrQuoteV5Nil
+	}
+	if err := checkHeader(quote.GetHeader(), QuoteVersionV5); err != nil {
+		return fmt.Errorf("quoteV5 Header error: %v", err)
+	}
+	if err := checkTDQuoteBodyDescriptor(quote.GetTdQuoteBodyDescriptor()); err != nil {
+		return fmt.Errorf("quoteV5 TD Quote Body Descriptor error: %v", err)
+	}
+	if quote.GetSignedDataSize() == 0 {
+		return fmt.Errorf("quoteV5 Signed Data Size is 0 bytes. Expected non-zero value")
+	}
+	if err := checkEcdsa256BitQuoteV4AuthData(quote.GetSignedData()); err != nil {
+		return fmt.Errorf("quoteV5 AuthData error: %v", err)
+	}
+	return nil
+}
+
+func checkTDQuoteBodyDescriptor(tdQuoteBodyDescriptor *pb.TDQuoteBodyDescriptor) error {
+	if tdQuoteBodyDescriptor == nil {
+		return ErrTDQuoteBodyDescriptorNil
+	}
+
+	if tdQuoteBodyDescriptor.GetTdQuoteBodyType() >= (1 << 16) {
+		return fmt.Errorf("td quote body type field size must fit in 2 bytes , got %d", tdQuoteBodyDescriptor.GetTdQuoteBodyType())
+	}
+	// TD quote body type 2(TDX1.0) and 3(TDX1.5) are supported.
+	switch tdQuoteBodyDescriptor.GetTdQuoteBodyType() {
+	case tdxVersion10BodyType:
+		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() < tdQuoteBodySizeV5TDX10 {
+			return fmt.Errorf("td quote body size is %d bytes. Expected minimum %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), 584)
+		}
+	case tdxVersion15BodyType:
+		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() < tdQuoteBodySizeV5TDX15 {
+			return fmt.Errorf("td quote body size is %d bytes. Expected minimum %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), 648)
+		}
+	default:
+		return fmt.Errorf("unsupported TD quote body type , got %d", tdQuoteBodyDescriptor.GetTdQuoteBodyType())
+	}
+
+	if err := checkTDQuoteBodyV5(tdQuoteBodyDescriptor.GetTdQuoteBodyV5(), tdQuoteBodyDescriptor.GetTdQuoteBodyType()); err != nil {
+		return fmt.Errorf("td quote body V5 error: %v", err)
 	}
 	return nil
 }
@@ -719,7 +988,10 @@ func HeaderToAbiBytes(header *pb.Header) ([]byte, error) {
 	if header == nil {
 		return nil, ErrHeaderNil
 	}
-	if err := checkHeader(header); err != nil {
+	if header.GetVersion() != QuoteVersionV4 && header.GetVersion() != QuoteVersionV5 {
+		return nil, fmt.Errorf("header invalid: version %v not supported", header.GetVersion())
+	}
+	if err := checkHeader(header, header.GetVersion()); err != nil {
 		return nil, fmt.Errorf("header invalid: %v", err)
 	}
 
