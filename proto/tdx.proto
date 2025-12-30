@@ -76,6 +76,46 @@ message TDQuoteBody {
   bytes report_data = 12;      // should be 64 bytes
 }
 
+// reference : https://download.01.org/intel-sgx/latest/dcap-latest/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf
+message QuoteV5 {
+  Header header = 1;  // should be 48 bytes
+
+  // TD report by which quote is generated
+  TDQuoteBodyDescriptor td_quote_body_descriptor = 2;  // variable size
+
+  // Size of the Quote Signature Data structure
+  int32 signed_data_size = 3;
+
+  // Quote Signature Data structure.
+  Ecdsa256BitQuoteV4AuthData signed_data = 4;  // The size should be same as signed_data_size
+
+  // Extra bytes included to fill the quote buffer
+  bytes extra_bytes = 5;  // These trailing bytes can be ignored
+}
+
+message TDQuoteBodyDescriptor {
+  int32 td_quote_body_type = 1;       // should be 2 bytes
+  int32 td_quote_body_size = 2;       // should be 4 bytes
+  TDQuoteBodyV5 td_quote_body_v5 = 3;  // variable size
+}
+
+message TDQuoteBodyV5 {
+  bytes tee_tcb_svn = 1;       // should be 16 bytes
+  bytes mr_seam = 2;           // should be 48 bytes
+  bytes mr_signer_seam = 3;    // should be 48 bytes
+  bytes seam_attributes = 4;   // should be 8 bytes
+  bytes td_attributes = 5;     // should be 8 bytes
+  bytes xfam = 6;              // should be 8 bytes
+  bytes mr_td = 7;             // should be 48 bytes
+  bytes mr_config_id = 8;      // should be 48 bytes
+  bytes mr_owner = 9;          // should be 48 bytes
+  bytes mr_owner_config = 10;  // should be 48 bytes
+  repeated bytes rtmrs = 11;   // should be 48 * rtmrsCount
+  bytes report_data = 12;      // should be 64 bytes
+  bytes tee_tcb_svn2 = 13;     // should be 16 bytes
+  bytes mr_service_td = 14;    // should be 48 bytes
+}
+
 message Ecdsa256BitQuoteV4AuthData {
   // The ECDSA 256-bit signature.
   bytes signature = 1;  // should be 64 bytes
