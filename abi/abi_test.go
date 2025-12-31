@@ -21,6 +21,7 @@ import (
 
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	test "github.com/google/go-tdx-guest/testing/testdata"
+	"google.golang.org/protobuf/proto"
 )
 
 // TODO: Use errors.Is() instead of string comparisons
@@ -115,105 +116,234 @@ func TestQuoteToAbiBytes(t *testing.T) {
 	if !bytes.Equal(test.RawQuote, rawQuote) {
 		t.Errorf("raw quote bytes got %v. Expected %v", rawQuote, test.RawQuote)
 	}
+	quoteV5, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawQuoteV5, err := QuoteToAbiBytes(quoteV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(test.RawQuoteV5, rawQuoteV5) {
+		t.Errorf("raw quote v5 bytes got %v. Expected %v", rawQuoteV5, test.RawQuoteV5)
+	}
 }
 
 func TestNilToAbiBytesConversions(t *testing.T) {
-
-	if _, err := QuoteToAbiBytes(nil); err != ErrQuoteNil {
-		t.Error(err)
+	tcs := []struct {
+		name string
+		call func() ([]byte, error)
+		want error
+	}{
+		{
+			name: "QuoteToAbiBytes",
+			call: func() ([]byte, error) { return QuoteToAbiBytes(nil) },
+			want: ErrQuoteNil,
+		},
+		{
+			name: "signedDataToAbiBytes",
+			call: func() ([]byte, error) { return signedDataToAbiBytes(nil) },
+			want: ErrQuoteV4AuthDataNil,
+		},
+		{
+			name: "certificationDataToAbiBytes",
+			call: func() ([]byte, error) { return certificationDataToAbiBytes(nil) },
+			want: ErrCertificationDataNil,
+		},
+		{
+			name: "qeReportCertificationDataToAbiBytes",
+			call: func() ([]byte, error) { return qeReportCertificationDataToAbiBytes(nil) },
+			want: ErrQeReportCertificationDataNil,
+		},
+		{
+			name: "qeAuthDataToAbiBytes",
+			call: func() ([]byte, error) { return qeAuthDataToAbiBytes(nil) },
+			want: ErrQeAuthDataNil,
+		},
+		{
+			name: "pckCertificateChainToAbiBytes",
+			call: func() ([]byte, error) { return pckCertificateChainToAbiBytes(nil) },
+			want: ErrPckCertChainNil,
+		},
+		{
+			name: "TdQuoteBodyToAbiBytes",
+			call: func() ([]byte, error) { return TdQuoteBodyToAbiBytes(nil) },
+			want: ErrTDQuoteBodyNil,
+		},
+		{
+			name: "HeaderToAbiBytes",
+			call: func() ([]byte, error) { return HeaderToAbiBytes(nil) },
+			want: ErrHeaderNil,
+		},
+		{
+			name: "EnclaveReportToAbiBytes",
+			call: func() ([]byte, error) { return EnclaveReportToAbiBytes(nil) },
+			want: ErrQeReportNil,
+		},
+		{
+			name: "TdQuoteBodyDescriptorToAbiBytes",
+			call: func() ([]byte, error) { return TdQuoteBodyDescriptorToAbiBytes(nil) },
+			want: ErrTDQuoteBodyDescriptorNil,
+		},
+		{
+			name: "tdQuoteBodyV5ToAbiBytes",
+			call: func() ([]byte, error) { return tdQuoteBodyV5ToAbiBytes(nil, tdxVersion15BodyType) },
+			want: ErrQuoteV5Nil,
+		},
 	}
-	if _, err := signedDataToAbiBytes(nil); err != ErrQuoteV4AuthDataNil {
-		t.Error(err)
-	}
-	if _, err := certificationDataToAbiBytes(nil); err != ErrCertificationDataNil {
-		t.Error(err)
-	}
-	if _, err := qeReportCertificationDataToAbiBytes(nil); err != ErrQeReportCertificationDataNil {
-		t.Error(err)
-	}
-	if _, err := qeAuthDataToAbiBytes(nil); err != ErrQeAuthDataNil {
-		t.Error(err)
-	}
-	if _, err := pckCertificateChainToAbiBytes(nil); err != ErrPckCertChainNil {
-		t.Error(err)
-	}
-	if _, err := TdQuoteBodyToAbiBytes(nil); err != ErrTDQuoteBodyNil {
-		t.Error(err)
-	}
-	if _, err := HeaderToAbiBytes(nil); err != ErrHeaderNil {
-		t.Error(err)
-	}
-	if _, err := EnclaveReportToAbiBytes(nil); err != ErrQeReportNil {
-		t.Error(err)
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.call(); err != tc.want {
+				t.Errorf("%s() returned error %v, want %v", tc.name, err, tc.want)
+			}
+		})
 	}
 }
 
 func TestInvalidConversionsToAbiBytes(t *testing.T) {
-	expectedErrors := []string{
-		"QuoteV4 invalid: QuoteV4 Header error: header is nil",
-		"QuoteV4 AuthData invalid: signature size is 0 bytes. Expected 64 bytes",
-		"certification data invalid: certification data type invalid, got 0, expected 6",
-		"certification data invalid: certification data type invalid, got 7, expected 6",
-		"certification data invalid: QE Report certification data error: QE Report certification data is nil",
-		"QE Report certification data invalid: QE Report error: QE Report is nil",
-		"QE AuthData invalid: parsed data size is 0 bytes. Expected 1 bytes",
-		"PCK certificate chain data invalid: PCK certificate chain data type invalid, got 0, expected 5",
-		"PCK certificate chain data invalid: PCK certificate chain data type invalid, got 7, expected 5",
-		"PCK certificate chain data invalid: PCK certificate chain size is 0. Expected size 2",
-		"TD quote body invalid: teeTcbSvn size is 0 bytes. Expected 16 bytes",
-		"header invalid: version 0 not supported",
-		"header invalid: version 1 not supported",
-		"header invalid: attestation key type not supported",
-		"header invalid: TEE type is not TDX",
-		"QE Report invalid: cpuSvn size is 0 bytes. Expected 16 bytes",
+	quoteV5, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		t.Fatalf("failed to parse RawQuoteV5: %v", err)
 	}
-	if _, err := QuoteToAbiBytes(&pb.QuoteV4{}); err == nil || err.Error() != expectedErrors[0] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[0])
-	}
-	if _, err := signedDataToAbiBytes(&pb.Ecdsa256BitQuoteV4AuthData{}); err == nil || err.Error() != expectedErrors[1] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[1])
-	}
-	if _, err := certificationDataToAbiBytes(&pb.CertificationData{}); err == nil || err.Error() != expectedErrors[2] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[2])
-	}
-	if _, err := certificationDataToAbiBytes(&pb.CertificationData{CertificateDataType: 7}); err == nil || err.Error() != expectedErrors[3] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[3])
-	}
-	if _, err := certificationDataToAbiBytes(&pb.CertificationData{CertificateDataType: qeReportCertificationDataType, Size: 2}); err == nil || err.Error() != expectedErrors[4] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[4])
-	}
-	if _, err := qeReportCertificationDataToAbiBytes(&pb.QEReportCertificationData{}); err == nil || err.Error() != expectedErrors[5] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[5])
-	}
-	if _, err := qeAuthDataToAbiBytes(&pb.QeAuthData{ParsedDataSize: 1}); err == nil || err.Error() != expectedErrors[6] {
+	tdQuoteBodyV5 := quoteV5.(*pb.QuoteV5).GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5()
 
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[6])
+	tcs := []struct {
+		name    string
+		call    func() ([]byte, error)
+		wantErr string
+	}{
+		{
+			name:    "QuoteV4HeaderNil",
+			call:    func() ([]byte, error) { return QuoteToAbiBytes(&pb.QuoteV4{}) },
+			wantErr: "QuoteV4 invalid: QuoteV4 Header error: header is nil",
+		},
+		{
+			name:    "Ecdsa256BitQuoteV4AuthDataNil",
+			call:    func() ([]byte, error) { return signedDataToAbiBytes(&pb.Ecdsa256BitQuoteV4AuthData{}) },
+			wantErr: "QuoteV4 AuthData invalid: signature size is 0 bytes. Expected 64 bytes",
+		},
+		{
+			name:    "CertificationDataEmpty",
+			call:    func() ([]byte, error) { return certificationDataToAbiBytes(&pb.CertificationData{}) },
+			wantErr: "certification data invalid: certification data type invalid, got 0, expected 6",
+		},
+		{
+			name: "CertificationDataType7",
+			call: func() ([]byte, error) {
+				return certificationDataToAbiBytes(&pb.CertificationData{CertificateDataType: 7})
+			},
+			wantErr: "certification data invalid: certification data type invalid, got 7, expected 6",
+		},
+		{
+			name: "CertificationDataQeReportNil",
+			call: func() ([]byte, error) {
+				return certificationDataToAbiBytes(&pb.CertificationData{CertificateDataType: qeReportCertificationDataType, Size: 2})
+			},
+			wantErr: "certification data invalid: QE Report certification data error: QE Report certification data is nil",
+		},
+		{
+			name:    "QEReportCertificationDataEmpty",
+			call:    func() ([]byte, error) { return qeReportCertificationDataToAbiBytes(&pb.QEReportCertificationData{}) },
+			wantErr: "QE Report certification data invalid: QE Report error: QE Report is nil",
+		},
+		{
+			name:    "QeAuthDataEmpty",
+			call:    func() ([]byte, error) { return qeAuthDataToAbiBytes(&pb.QeAuthData{ParsedDataSize: 1}) },
+			wantErr: "QE AuthData invalid: parsed data size is 0 bytes. Expected 1 bytes",
+		},
+		{
+			name:    "PCKCertificateChainDataEmpty",
+			call:    func() ([]byte, error) { return pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{}) },
+			wantErr: "PCK certificate chain data invalid: PCK certificate chain data type invalid, got 0, expected 5",
+		},
+		{
+			name: "PCKCertificateChainDataType7",
+			call: func() ([]byte, error) {
+				return pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{CertificateDataType: 7})
+			},
+			wantErr: "PCK certificate chain data invalid: PCK certificate chain data type invalid, got 7, expected 5",
+		},
+		{
+			name: "PCKCertificateChainDataSize0",
+			call: func() ([]byte, error) {
+				return pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{CertificateDataType: pckReportCertificationDataType, Size: 2})
+			},
+			wantErr: "PCK certificate chain data invalid: PCK certificate chain size is 0. Expected size 2",
+		},
+		{
+			name:    "TDQuoteBodyEmpty",
+			call:    func() ([]byte, error) { return TdQuoteBodyToAbiBytes(&pb.TDQuoteBody{}) },
+			wantErr: "TD quote body invalid: teeTcbSvn size is 0 bytes. Expected 16 bytes",
+		},
+		{
+			name:    "HeaderEmpty",
+			call:    func() ([]byte, error) { return HeaderToAbiBytes(&pb.Header{}) },
+			wantErr: "header invalid: version 0 not supported",
+		},
+		{
+			name:    "HeaderV1",
+			call:    func() ([]byte, error) { return HeaderToAbiBytes(&pb.Header{Version: 1}) },
+			wantErr: "header invalid: version 1 not supported",
+		},
+		{
+			name: "HeaderAttestationKeyType1",
+			call: func() ([]byte, error) {
+				return HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: 1})
+			},
+			wantErr: "header invalid: attestation key type not supported",
+		},
+		{
+			name: "HeaderTeeType1",
+			call: func() ([]byte, error) {
+				return HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: AttestationKeyType, TeeType: 0x01})
+			},
+			wantErr: "header invalid: TEE type is not TDX",
+		},
+		{
+			name:    "EnclaveReportEmpty",
+			call:    func() ([]byte, error) { return EnclaveReportToAbiBytes(&pb.EnclaveReport{}) },
+			wantErr: "QE Report invalid: cpuSvn size is 0 bytes. Expected 16 bytes",
+		},
+		{
+			name:    "QuoteV5HeaderNil",
+			call:    func() ([]byte, error) { return QuoteToAbiBytes(&pb.QuoteV5{}) },
+			wantErr: "quoteV5 invalid: quoteV5 Header error: header is nil",
+		},
+		{
+			name:    "TDQuoteBodyV5Version5",
+			call:    func() ([]byte, error) { return tdQuoteBodyV5ToAbiBytes(&pb.TDQuoteBodyV5{}, 5) },
+			wantErr: "td quote body V5 invalid: tdx version 5 is not supported",
+		},
+		{
+			name:    "TDQuoteBodyV5Empty",
+			call:    func() ([]byte, error) { return tdQuoteBodyV5ToAbiBytes(&pb.TDQuoteBodyV5{}, tdxVersion10BodyType) },
+			wantErr: "td quote body V5 invalid: teeTcbSvn size is 0 bytes. Expected 16 bytes",
+		},
+		{
+			name:    "TdQuoteBodyV5Svn2ForTdx10",
+			call:    func() ([]byte, error) { return tdQuoteBodyV5ToAbiBytes(tdQuoteBodyV5, tdxVersion10BodyType) },
+			wantErr: "td quote body V5 invalid: teeTcbSvn2 is not expected to be set for TDX version 1.0",
+		},
+		{
+			name: "TdQuoteBodyV5Svn2InvalidSize",
+			call: func() ([]byte, error) {
+				body := proto.Clone(tdQuoteBodyV5).(*pb.TDQuoteBodyV5)
+				body.TeeTcbSvn2 = []byte{1}
+				return tdQuoteBodyV5ToAbiBytes(body, tdxVersion15BodyType)
+			},
+			wantErr: "td quote body V5 invalid: teeTcbSvn2 size is 1 bytes. Expected 16 bytes",
+		},
+		{
+			name:    "TDQuoteBodyDescriptorEmpty",
+			call:    func() ([]byte, error) { return TdQuoteBodyDescriptorToAbiBytes(&pb.TDQuoteBodyDescriptor{}) },
+			wantErr: "td quote body descriptor invalid: unsupported TD quote body type , got 0",
+		},
 	}
-	if _, err := pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{}); err == nil || err.Error() != expectedErrors[7] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[7])
-	}
-	if _, err := pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{CertificateDataType: 7}); err == nil || err.Error() != expectedErrors[8] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[8])
-	}
-	if _, err := pckCertificateChainToAbiBytes(&pb.PCKCertificateChainData{CertificateDataType: pckReportCertificationDataType, Size: 2}); err == nil || err.Error() != expectedErrors[9] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[9])
-	}
-	if _, err := TdQuoteBodyToAbiBytes(&pb.TDQuoteBody{}); err == nil || err.Error() != expectedErrors[10] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[10])
-	}
-	if _, err := HeaderToAbiBytes(&pb.Header{}); err == nil || err.Error() != expectedErrors[11] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[11])
-	}
-	if _, err := HeaderToAbiBytes(&pb.Header{Version: 1}); err == nil || err.Error() != expectedErrors[12] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[12])
-	}
-	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: 1}); err == nil || err.Error() != expectedErrors[13] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[13])
-	}
-	if _, err := HeaderToAbiBytes(&pb.Header{Version: QuoteVersionV4, AttestationKeyType: AttestationKeyType, TeeType: 0x01}); err == nil || err.Error() != expectedErrors[14] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[14])
-	}
-	if _, err := EnclaveReportToAbiBytes(&pb.EnclaveReport{}); err == nil || err.Error() != expectedErrors[15] {
-		t.Errorf("error found: %v, want error: %s", err, expectedErrors[15])
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.call(); err == nil || err.Error() != tc.wantErr {
+				t.Errorf("%s() returned error %v, want %v", tc.name, err, tc.wantErr)
+			}
+		})
 	}
 }
