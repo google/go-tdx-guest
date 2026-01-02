@@ -70,8 +70,7 @@ message RootOfTrust {
   // If true, download and check the CRL for revoked certificates.
   bool check_crl = 3;
 
-  // If true, then check is not permitted to download necessary files for
-  // verification.
+  // If true, download collateral files for TCB SVN verification.
   bool get_collateral = 4;
 }
 
