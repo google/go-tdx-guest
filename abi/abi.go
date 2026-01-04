@@ -1143,6 +1143,8 @@ func QuoteToAbiBytes(quote any) ([]byte, error) {
 	switch q := quote.(type) {
 	case *pb.QuoteV4:
 		return quoteToAbiBytesV4(q)
+	case *pb.QuoteV5:
+		return quoteToAbiBytesV5(q)
 	default:
 		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}
@@ -1180,6 +1182,93 @@ func quoteToAbiBytesV4(quote *pb.QuoteV4) ([]byte, error) {
 	if quote.GetExtraBytes() != nil {
 		data = append(data, quote.GetExtraBytes()...)
 	}
+	return data, nil
+}
+
+func quoteToAbiBytesV5(quote *pb.QuoteV5) ([]byte, error) {
+	if err := CheckQuoteV5(quote); err != nil {
+		return nil, fmt.Errorf("quoteV5 invalid: %v", err)
+	}
+	var data []byte
+
+	headerData, err := HeaderToAbiBytes(quote.GetHeader())
+	if err != nil {
+		return nil, fmt.Errorf("header to abi bytes conversion failed: %v", err)
+	}
+	data = append(data, headerData...)
+
+	bodyDescriptorData, err := TdQuoteBodyDescriptorToAbiBytes(quote.GetTdQuoteBodyDescriptor())
+	if err != nil {
+		return nil, fmt.Errorf("td quote body descriptor to abi bytes conversion failed: %v", err)
+	}
+	data = append(data, bodyDescriptorData...)
+
+	signedDataSizeBytes := make([]byte, signedDataSizeFieldLengthV5)
+	binary.LittleEndian.PutUint32(signedDataSizeBytes, uint32(quote.GetSignedDataSize()))
+	data = append(data, signedDataSizeBytes...)
+
+	signedData, err := signedDataToAbiBytes(quote.GetSignedData())
+	if err != nil {
+		return nil, fmt.Errorf("signed data to abi bytes conversion failed: %v", err)
+	}
+	data = append(data, signedData...)
+
+	data = append(data, quote.GetExtraBytes()...)
+
+	return data, nil
+}
+
+// TdQuoteBodyDescriptorToAbiBytes translates the TDQuoteBodyDescriptor back into its little-endian ABI format
+func TdQuoteBodyDescriptorToAbiBytes(tdQuoteBodyDescriptor *pb.TDQuoteBodyDescriptor) ([]byte, error) {
+	if tdQuoteBodyDescriptor == nil {
+		return nil, ErrTDQuoteBodyDescriptorNil
+	}
+	if err := checkTDQuoteBodyDescriptor(tdQuoteBodyDescriptor); err != nil {
+		return nil, fmt.Errorf("td quote body descriptor invalid: %v", err)
+	}
+	quoteBodyDescriptorSize := tdQuoteBodyDescriptor.GetTdQuoteBodySize() + quoteBodyTypeSizeV5 + quoteBodySizeFieldLengthV5
+	data := make([]byte, quoteBodyDescriptorSize)
+	var offset int32
+	binary.LittleEndian.PutUint16(data[offset:offset+quoteBodyTypeSizeV5], uint16(tdQuoteBodyDescriptor.GetTdQuoteBodyType()))
+	offset = quoteBodyTypeSizeV5
+	binary.LittleEndian.PutUint32(data[offset:offset+quoteBodySizeFieldLengthV5], uint32(tdQuoteBodyDescriptor.GetTdQuoteBodySize()))
+	offset += quoteBodySizeFieldLengthV5
+
+	tdQuoteBodyData, err := tdQuoteBodyV5ToAbiBytes(tdQuoteBodyDescriptor.GetTdQuoteBodyV5(), tdQuoteBodyDescriptor.GetTdQuoteBodyType())
+	if err != nil {
+		return nil, fmt.Errorf("td quote body to abi bytes conversion failed: %v", err)
+	}
+	if len(data)-int(offset) < len(tdQuoteBodyData) {
+		return nil, fmt.Errorf("td quote body size is %d bytes. Expected %d bytes", len(tdQuoteBodyData), len(data)-int(offset))
+	}
+	copy(data[offset:], tdQuoteBodyData)
+
+	return data, nil
+}
+
+func tdQuoteBodyV5ToAbiBytes(tdQuoteBodyV5 *pb.TDQuoteBodyV5, tdxVersion int32) ([]byte, error) {
+	if tdQuoteBodyV5 == nil {
+		return nil, ErrQuoteV5Nil
+	}
+	if err := checkTDQuoteBodyV5(tdQuoteBodyV5, tdxVersion); err != nil {
+		return nil, fmt.Errorf("td quote body V5 invalid: %v", err)
+	}
+	data, err := TdQuoteBodyToAbiBytes(getCommonFieldsFromV5(tdQuoteBodyV5))
+	if err != nil {
+		return nil, fmt.Errorf("td quote body V5 to abi bytes conversion failed: %v", err)
+	}
+
+	expectedQuoteBodySize := tdQuoteBodySizeV5TDX10
+	if tdxVersion == tdxVersion15BodyType {
+		data = append(data, tdQuoteBodyV5.GetTeeTcbSvn2()...)
+		data = append(data, tdQuoteBodyV5.GetMrServiceTd()...)
+		expectedQuoteBodySize = tdQuoteBodySizeV5TDX15
+	}
+
+	if len(data) != expectedQuoteBodySize {
+		return nil, fmt.Errorf("td quote body V5 size is %d bytes. Expected %d bytes", len(data), expectedQuoteBodySize)
+	}
+
 	return data, nil
 }
 
