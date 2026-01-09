@@ -36,15 +36,23 @@ const (
 	xfamFixed0 = 0x0006DBE7
 	// If bit X is 1 in tdAttributesFixed1, it must be 1 in any tdAttributes.
 	tdAttributesFixed1            = 0x0
+	// As per the DCAP spec [1], revision 0.9 section A.3.4, the following bits can be used in TdAttributes:
+	//   - 00: DEBUG
+	//   - 28: SEPT_VE_DISABLE
+	//   - 30: PKS
+	//   - 31: KL
+	//   - 63: PERFMON
+	// [1]: https://download.01.org/intel-sgx/sgx-dcap/1.24/linux/docs/Intel_TDX_DCAP_Quoting_Library_API.pdf
+	tdxAttributesDebugSupport     = 1 << 0
 	tdxAttributesSeptVeDisSupport = 1 << 28
 	tdxAttributesPksSupport       = 1 << 30
+	tdxAttributesKlSupport        = 1 << 31
 	tdxAttributesPerfmonSupport   = 1 << 63
-	// Supported ATTRIBUTES bits depend on the supported features - bits 0 (DEBUG), 30 (PKS), 63 (PERFMON)
-	// and 28 (SEPT VE DISABLE)
-	// If bit X is 0 in tdAttributesFixed0, it must be 0 in any tdAttributes.
-	tdAttributesFixed0   = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
-	tdAttributesDebugBit = 0x1
-	rtmrsCount           = 4
+
+	// tdAttributesFixed0 enforces that all RESERVED bits from the specification are 0.
+	// If bit X is 1 in tdAttributesFixed0, it must be 0 in any tdAttributes.
+	tdAttributesFixed0 = tdxAttributesDebugSupport | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesKlSupport | tdxAttributesPerfmonSupport
+	rtmrsCount         = 4
 )
 
 // Options represents validation options for a TDX attestation Quote.
@@ -312,7 +320,7 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugChec
 	tdAttributes := binary.LittleEndian.Uint64(value)
 
 	if enableTdDebugCheck {
-		if (tdAttributes & tdAttributesDebugBit) != 0 {
+		if (tdAttributes & tdxAttributesDebugSupport) != 0 {
 			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed")
 		}
 	}
