@@ -1013,17 +1013,21 @@ func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) error {
 
 	return nil
 }
-
 func getTeeTcbSvn(tdQuoteBody any) ([]byte, []byte, error) {
+	var teeTcbSvn []byte
+	var teeTcbSvn2 []byte
 	switch quoteBody := tdQuoteBody.(type) {
 	case *pb.TDQuoteBody:
-		return quoteBody.GetTeeTcbSvn(), nil, nil
+		teeTcbSvn = quoteBody.GetTeeTcbSvn()
 	case *pb.TDQuoteBodyV5:
-		return quoteBody.GetTeeTcbSvn(), quoteBody.GetTeeTcbSvn2(), nil
+		teeTcbSvn = quoteBody.GetTeeTcbSvn()
+		teeTcbSvn2 = quoteBody.GetTeeTcbSvn2()
 	default:
 		return nil, nil, fmt.Errorf("unsupported type for tdQuoteBody: %T", tdQuoteBody)
 	}
+	return teeTcbSvn, teeTcbSvn2, nil
 }
+
 
 func readTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions) (pcs.TcbLevel, error) {
 	tcbLevels := tcbInfo.TcbLevels
