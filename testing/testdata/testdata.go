@@ -49,6 +49,11 @@ var RootCrlBody []byte
 //go:embed "sample_tcbInfo_response"
 var TcbInfoBody []byte
 
+// TcbInfoV5Body contains sample TCBInfo response for TDX 1.5. To be used only for testing
+//
+//go:embed "sample_tcbinfo_response_v5"
+var TcbInfoV5Body []byte
+
 // QeIdentityBody  contains sample QeIdentity response. To be used only for testing
 //
 //go:embed "sample_qeIdentity_response"

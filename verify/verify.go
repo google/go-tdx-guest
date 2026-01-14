@@ -630,16 +630,15 @@ func verifyCollateral(options *Options) error {
 // ExtractChainFromQuote extracts a SGX PCK CertificateChain from a given TD quote.
 // It is the caller's responsibility to verify the quote before calling this function.
 func ExtractChainFromQuote(quote any) (*PCKCertificateChain, error) {
-	switch q := quote.(type) {
-	case *pb.QuoteV4:
-		return extractChainFromQuoteV4(q)
-	default:
-		return nil, fmt.Errorf("unsupported quote type: %T", quote)
+	_, _, signedData, versionErr := getQuoteFields(quote)
+	if versionErr != nil {
+		return nil, versionErr
 	}
+	return extractChainFromQuote(signedData)
 }
 
-func extractChainFromQuoteV4(quote *pb.QuoteV4) (*PCKCertificateChain, error) {
-	certChainBytes := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetPckCertificateChainData().GetPckCertChain()
+func extractChainFromQuote(signedData *pb.Ecdsa256BitQuoteV4AuthData) (*PCKCertificateChain, error) {
+	certChainBytes := signedData.GetCertificationData().GetQeReportCertificationData().GetPckCertificateChainData().GetPckCertChain()
 	if certChainBytes == nil {
 		return nil, ErrPCKCertChainNil
 	}
@@ -768,16 +767,37 @@ func validateCRL(crl *x509.RevocationList, trustedCertificate *x509.Certificate)
 	return nil
 }
 
-func getHeaderAndTdQuoteBodyInAbiBytes(quote *pb.QuoteV4) ([]byte, error) {
-	header, err := abi.HeaderToAbiBytes(quote.GetHeader())
-	if err != nil {
-		return nil, fmt.Errorf("could not convert header to ABI bytes: %v", err)
+func getHeaderAndTdQuoteBodyInAbiBytes(quote any) ([]byte, error) {
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		header := q.GetHeader()
+		tdQuoteBody := q.GetTdQuoteBody()
+		headerBytes, err := abi.HeaderToAbiBytes(header)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert header to ABI bytes: %v", err)
+		}
+		quoteBodyBytes, err := abi.TdQuoteBodyToAbiBytes(tdQuoteBody)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert TD Quote Body to ABI bytes: %v", err)
+		}
+		return append(headerBytes, quoteBodyBytes...), nil
+
+	case *pb.QuoteV5:
+		header := q.GetHeader()
+		headerbytes, err := abi.HeaderToAbiBytes(header)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert header to ABI bytes: %v", err)
+		}
+		quoteBodyDescriptorBytes, err := abi.TdQuoteBodyDescriptorToAbiBytes(q.GetTdQuoteBodyDescriptor())
+		if err != nil {
+			return nil, fmt.Errorf("could not convert TD Quote Body Descriptor to ABI bytes: %v", err)
+		}
+		return append(headerbytes, quoteBodyDescriptorBytes...), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}
-	tdQuoteBody, err := abi.TdQuoteBodyToAbiBytes(quote.GetTdQuoteBody())
-	if err != nil {
-		return nil, fmt.Errorf("could not convert TD Quote Body to ABI bytes: %v", err)
-	}
-	return append(header, tdQuoteBody...), nil
+
 }
 
 func verifyPCKCertificationChain(options *Options) error {
@@ -875,16 +895,16 @@ func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate
 	return x509.VerifyOptions{Roots: trustedRoots, Intermediates: intermediates, CurrentTime: now}
 }
 
-func verifyHash256(quote *pb.QuoteV4) error {
-	qeReportCertificationData := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData()
+func verifyHash256(signedData *pb.Ecdsa256BitQuoteV4AuthData) error {
+	qeReportCertificationData := signedData.GetCertificationData().GetQeReportCertificationData()
 	qeReportData := qeReportCertificationData.GetQeReport().GetReportData()
 	qeAuthData := qeReportCertificationData.GetQeAuthData().GetData()
-	attestKey := quote.GetSignedData().GetEcdsaAttestationKey()
+	attestKey := signedData.GetEcdsaAttestationKey()
 
-	concatOfAttestKeyandQeAuthData := append(attestKey, qeAuthData...)
+	attestKeyandQeAuthData := append(attestKey, qeAuthData...)
 	var hashedMessage []byte
-	hashedConcatOfAttestKeyandQeAuthData := sha256.Sum256(concatOfAttestKeyandQeAuthData)
-	hashedMessage = hashedConcatOfAttestKeyandQeAuthData[:]
+	hashedAttestKeyandQeAuthData := sha256.Sum256(attestKeyandQeAuthData)
+	hashedMessage = hashedAttestKeyandQeAuthData[:]
 	hashedMessage = append(hashedMessage, make([]byte, len(qeReportData)-len(hashedMessage))...)
 	if !bytes.Equal(hashedMessage, qeReportData) {
 		return ErrSHA56VerificationFail
@@ -1104,22 +1124,62 @@ func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions
 	}
 	return nil
 }
+func getCommonTdQuoteBodyFields(tdQuoteBodyV5 *pb.TDQuoteBodyV5) *pb.TDQuoteBody {
+	return &pb.TDQuoteBody{
+		TeeTcbSvn:      tdQuoteBodyV5.GetTeeTcbSvn(),
+		MrSeam:         tdQuoteBodyV5.GetMrSeam(),
+		MrSignerSeam:   tdQuoteBodyV5.GetMrSignerSeam(),
+		SeamAttributes: tdQuoteBodyV5.GetSeamAttributes(),
+		TdAttributes:   tdQuoteBodyV5.GetTdAttributes(),
+		Xfam:           tdQuoteBodyV5.GetXfam(),
+		MrTd:           tdQuoteBodyV5.GetMrTd(),
+		MrConfigId:     tdQuoteBodyV5.GetMrConfigId(),
+		MrOwner:        tdQuoteBodyV5.GetMrOwner(),
+		MrOwnerConfig:  tdQuoteBodyV5.GetMrOwnerConfig(),
+		Rtmrs:          tdQuoteBodyV5.GetRtmrs(),
+		ReportData:     tdQuoteBodyV5.GetReportData(),
+	}
+}
 
-func verifyQuote(quote *pb.QuoteV4, options *Options) error {
+func getQuoteFields(quote any) (*pb.Header, *pb.TDQuoteBody, *pb.Ecdsa256BitQuoteV4AuthData, error) {
+	var header *pb.Header
+	var signedData *pb.Ecdsa256BitQuoteV4AuthData
+	var tdQuoteBody *pb.TDQuoteBody
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		header = q.GetHeader()
+		signedData = q.GetSignedData()
+		tdQuoteBody = q.GetTdQuoteBody()
+	case *pb.QuoteV5:
+		header = q.GetHeader()
+		signedData = q.GetSignedData()
+		tdQuoteBody = getCommonTdQuoteBodyFields(q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5())
+	default:
+		return nil, nil, nil, fmt.Errorf("unsupported quote type: %T", quote)
+	}
+	return header, tdQuoteBody, signedData, nil
+}
+
+func verifyQuote(quote any, options *Options) error {
+	_, tdQuoteBody, signedData, err := getQuoteFields(quote)
+	if err != nil {
+		return err
+	}
+
 	chain := options.chain
 	collateral := options.collateral
 	pckCertExtensions := options.pckCertExtensions
-	attestkey := quote.GetSignedData().GetEcdsaAttestationKey()
+	attestKey := signedData.GetEcdsaAttestationKey()
 
 	logger.V(1).Info("Extracting attestation key from the quote")
-	attestPublicKey, err := bytesToEcdsaPubKey(attestkey)
+	attestPublicKey, err := bytesToEcdsaPubKey(attestKey)
 	if err != nil {
 		return fmt.Errorf("attestation key in the quote is invalid: %v", err)
 	}
 	logger.V(1).Info("Attestation key extracted successfully from the quote")
 
 	logger.V(1).Info("Extracting signature present in the quote")
-	signature := quote.GetSignedData().GetSignature()
+	signature := signedData.GetSignature()
 	signature, err = abi.SignatureToDER(signature)
 	if err != nil {
 		return fmt.Errorf("unable to convert QuoteV4's signature to DER format: %v", err)
@@ -1141,7 +1201,7 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 	}
 	logger.V(1).Info("Header and TD Quote Body verified successfully")
 
-	qeReportCertificationData := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData()
+	qeReportCertificationData := signedData.GetCertificationData().GetQeReportCertificationData()
 
 	logger.V(1).Info("Verifying the QE Report signature using PCK Leaf certificate")
 	if err := tdxProtoQeReportSignature(qeReportCertificationData, chain.PCKCertificate); err != nil {
@@ -1150,14 +1210,14 @@ func verifyQuote(quote *pb.QuoteV4, options *Options) error {
 	logger.V(1).Info("QE Report signature verified successfully")
 
 	logger.V(1).Info("Verifying QE Report Data")
-	if err := verifyHash256(quote); err != nil {
+	if err := verifyHash256(signedData); err != nil {
 		return fmt.Errorf("error verifying QE report data: %v", err)
 	}
 	logger.V(1).Info("QE Report Data verified successfully")
 
 	if collateral != nil {
 		logger.V(1).Info("Verifying TD Quote Body using TCB Info API response")
-		if err := verifyTdQuoteBody(quote.GetTdQuoteBody(),
+		if err := verifyTdQuoteBody(tdQuoteBody,
 			&tdQuoteBodyOptions{
 				tcbInfo:           collateral.TdxTcbInfo.TcbInfo,
 				pckCertExtensions: pckCertExtensions,
@@ -1311,16 +1371,12 @@ func verifyQeIdentity(options *Options) error {
 }
 
 func verifyEvidence(quote any, options *Options) error {
-	switch q := quote.(type) {
-	case *pb.QuoteV4:
-		return verifyEvidenceV4(q, options)
-	default:
-		return fmt.Errorf("unsupported quote type: %T", quote)
+	header, _, _, err := getQuoteFields(quote)
+	if err != nil {
+		return err
 	}
-}
 
-func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
-	if quote.GetHeader().GetTeeType() != abi.TeeTDX {
+	if header.GetTeeType() != abi.TeeTDX {
 		return abi.ErrTeeType
 	}
 
@@ -1355,7 +1411,7 @@ func verifyEvidenceV4(quote *pb.QuoteV4, options *Options) error {
 
 // TdxQuote verifies the protobuf representation of an attestation quote's signature
 // based on the quote's SignatureAlgo, provided the certificate chain is valid for
-// formats - QuoteV4.
+// formats - QuoteV4, QuoteV5.
 func TdxQuote(quote any, options *Options) error {
 	return TdxQuoteContext(context.TODO(), quote, options)
 }
@@ -1365,12 +1421,7 @@ func TdxQuoteContext(ctx context.Context, quote any, options *Options) error {
 	if options == nil {
 		return ErrOptionsNil
 	}
-	switch q := quote.(type) {
-	case *pb.QuoteV4:
-		return tdxQuoteV4(ctx, q, options)
-	default:
-		return fmt.Errorf("unsupported quote type: %T", quote)
-	}
+	return tdxQuote(ctx, quote, options)
 }
 
 // SupportedTcbLevelsFromCollateral returns the matching TCB levels of TDX TCB and QE Identity respectively by checking collaterals.
@@ -1387,38 +1438,45 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 		return pcs.TcbLevel{}, pcs.TcbLevel{}, ErrMissingPckExt
 	}
 
-	switch q := quote.(type) {
-	case *pb.QuoteV4:
-		var err error
-		foundTcbInfo, tcbErr := readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBody(), options.pckCertExtensions)
-		if tcbErr != nil {
-			err = multierr.Combine(err, tcbErr)
-		}
-
-		foundQe, qeErr := readQeTcbStatus(options.collateral.QeIdentity.EnclaveIdentity.TcbLevels, q.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
-		if qeErr != nil {
-			err = multierr.Combine(err, qeErr)
-		}
-		return foundTcbInfo, foundQe, err
-	default:
-		return pcs.TcbLevel{}, pcs.TcbLevel{}, fmt.Errorf("unsupported quote type: %T", quote)
+	var err error
+	_, tdQuoteBody, signedData, versionErr := getQuoteFields(quote)
+	if versionErr != nil {
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, versionErr
 	}
+	foundTcbInfo, tcbErr := readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, tdQuoteBody, options.pckCertExtensions)
+	if tcbErr != nil {
+		err = multierr.Combine(err, tcbErr)
+	}
+
+	foundQe, qeErr := readQeTcbStatus(options.collateral.QeIdentity.EnclaveIdentity.TcbLevels, signedData.GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
+	if qeErr != nil {
+		err = multierr.Combine(err, qeErr)
+	}
+	return foundTcbInfo, foundQe, err
+
 }
 
 // tdxQuoteV4 verifies the QuoteV4 protobuf representation of an attestation quote's signature
 // based on the quote's SignatureAlgo, provided the certificate chain is valid.
-func tdxQuoteV4(ctx context.Context, quote *pb.QuoteV4, options *Options) error {
+func tdxQuote(ctx context.Context, quote any, options *Options) error {
 	logger.V(1).Info("Checking that the quote parameters meet the required size")
-	logger.V(2).Info("Quote Version found: ", quote.Header.Version)
-	logger.V(2).Infof("Quote TeeType found: 0x%x", quote.Header.TeeType)
+	header, _, signedData, err := getQuoteFields(quote)
+	if err != nil {
+		return err
+	}
 
-	if err := abi.CheckQuoteV4(quote); err != nil {
-		return fmt.Errorf("QuoteV4 invalid: %v", err)
+	checkQuoteErr := abi.CheckQuote(quote)
+
+	logger.V(2).Info("Quote Version found: ", header.Version)
+	logger.V(2).Infof("Quote TeeType found: 0x%x", header.TeeType)
+
+	if checkQuoteErr != nil {
+		return fmt.Errorf("quote invalid: %v", checkQuoteErr)
 	}
 	logger.V(1).Info("Quote parameters meet the required size")
 
 	logger.V(1).Info("Extracting PCK certificate chain from the quote")
-	chain, err := extractChainFromQuoteV4(quote)
+	chain, err := extractChainFromQuote(signedData)
 	if err != nil {
 		return err
 	}
@@ -1451,7 +1509,7 @@ func tdxQuoteV4(ctx context.Context, quote *pb.QuoteV4, options *Options) error 
 	if options.Now == nil {
 		options.Now = defaultTimeSet()
 	}
-	return verifyEvidenceV4(quote, options)
+	return verifyEvidence(quote, options)
 }
 
 // RawTdxQuote verifies the raw bytes representation of an attestation quote
