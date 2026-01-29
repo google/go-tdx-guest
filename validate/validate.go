@@ -90,6 +90,8 @@ type TdQuoteBodyOptions struct {
 	// EnableTdDebugCheck determines whether the DEBUG bit (bit 0) in TD_ATTRIBUTES is checked.
 	// If true, the DEBUG bit must be 0. If false, the DEBUG bit is not checked.
 	EnableTdDebugCheck bool
+	MinimumTeeTcbSvn2  []byte
+	MrServiceTd        []byte
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -124,7 +126,7 @@ func checkOptionsLengths(opts *Options) error {
 		}
 		return nil
 	}
-	return multierr.Combine(
+	lengthErr := multierr.Combine(
 		lengthCheck("mr_seam", abi.MrSeamSize, opts.TdQuoteBodyOptions.MrSeam),
 		lengthCheck("td_attributes", abi.TdAttributesSize, opts.TdQuoteBodyOptions.TdAttributes),
 		lengthCheck("xfam", abi.XfamSize, opts.TdQuoteBodyOptions.Xfam),
@@ -137,6 +139,13 @@ func checkOptionsLengths(opts *Options) error {
 		lengthCheckMany("rtmrs", eqConstraint, abi.RtmrSize, opts.TdQuoteBodyOptions.Rtmrs),
 		lengthCheckMany("any_mr_td", nil, abi.MrTdSize, opts.TdQuoteBodyOptions.AnyMrTd),
 	)
+	if opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2 != nil {
+		lengthErr = multierr.Combine(lengthErr, lengthCheck("minimum_tee_tcb_svn2", abi.TeeTcbSvn2SizeV5, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2))
+	}
+	if opts.TdQuoteBodyOptions.MrServiceTd != nil {
+		lengthErr = multierr.Combine(lengthErr, lengthCheck("mr_service_td", abi.MrServiceTdSizeV5, opts.TdQuoteBodyOptions.MrServiceTd))
+	}
+	return lengthErr
 }
 
 // PolicyToOptions returns an Options object that is represented by a Policy message.
@@ -166,6 +175,8 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			ReportData:         policy.GetTdQuoteBodyPolicy().GetReportData(),
 			AnyMrTd:            policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
 			EnableTdDebugCheck: policy.GetTdQuoteBodyPolicy().GetEnableTdDebugCheck(),
+			MinimumTeeTcbSvn2:  policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn2(),
+			MrServiceTd:        policy.GetTdQuoteBodyPolicy().GetMrServiceTd(),
 		},
 	}
 
@@ -223,21 +234,78 @@ func byteCheck(option, field string, size int, given, required []byte) error {
 	return nil
 }
 
-func exactByteMatch(quote *pb.QuoteV4, opts *Options) error {
-	givenRtmr := quote.GetTdQuoteBody().GetRtmrs()
-	return multierr.Combine(
-		byteCheck("MrSeam", "MR_SEAM", abi.MrSeamSize, quote.GetTdQuoteBody().GetMrSeam(), opts.TdQuoteBodyOptions.MrSeam),
-		byteCheck("TdAttributes", "TD_ATTRIBUTES", abi.TdAttributesSize, quote.GetTdQuoteBody().GetTdAttributes(), opts.TdQuoteBodyOptions.TdAttributes),
-		byteCheck("Xfam", "XFAM", abi.XfamSize, quote.GetTdQuoteBody().GetXfam(), opts.TdQuoteBodyOptions.Xfam),
-		byteCheck("MrTd", "MR_TD", abi.MrTdSize, quote.GetTdQuoteBody().GetMrTd(), opts.TdQuoteBodyOptions.MrTd),
-		byteCheck("MrConfigID", "MR_CONFIG_ID", abi.MrConfigIDSize, quote.GetTdQuoteBody().GetMrConfigId(), opts.TdQuoteBodyOptions.MrConfigID),
-		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, quote.GetTdQuoteBody().GetMrOwner(), opts.TdQuoteBodyOptions.MrOwner),
-		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, quote.GetTdQuoteBody().GetMrOwnerConfig(), opts.TdQuoteBodyOptions.MrOwnerConfig),
-		byteCheckRtmr(abi.RtmrSize, givenRtmr, opts.TdQuoteBodyOptions.Rtmrs),
-		byteCheckAny(abi.MrTdSize, quote.GetTdQuoteBody().GetMrTd(), opts.TdQuoteBodyOptions.AnyMrTd),
-		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, quote.GetTdQuoteBody().GetReportData(), opts.TdQuoteBodyOptions.ReportData),
-		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, quote.GetHeader().GetQeVendorId(), opts.HeaderOptions.QeVendorID),
+func exactByteMatch(anyQuote any, opts *Options) error {
+	var (
+		mrSeam, tdAttributes, xfam, mrTd, mrConfigID   []byte
+		mrOwner, mrOwnerConfig, reportData, qeVendorID []byte
+		rtmrs                                          [][]byte
+		minimumTeeTcbSvn2, mrServiceTd                 []byte
 	)
+
+	switch q := anyQuote.(type) {
+	case *pb.QuoteV4:
+		mrSeam = q.GetTdQuoteBody().GetMrSeam()
+		tdAttributes = q.GetTdQuoteBody().GetTdAttributes()
+		xfam = q.GetTdQuoteBody().GetXfam()
+		mrTd = q.GetTdQuoteBody().GetMrTd()
+		mrConfigID = q.GetTdQuoteBody().GetMrConfigId()
+		mrOwner = q.GetTdQuoteBody().GetMrOwner()
+		mrOwnerConfig = q.GetTdQuoteBody().GetMrOwnerConfig()
+		rtmrs = q.GetTdQuoteBody().GetRtmrs()
+		reportData = q.GetTdQuoteBody().GetReportData()
+		qeVendorID = q.GetHeader().GetQeVendorId()
+
+	case *pb.QuoteV5:
+		mrSeam = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrSeam()
+		tdAttributes = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTdAttributes()
+		xfam = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetXfam()
+		mrTd = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrTd()
+		mrConfigID = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrConfigId()
+		mrOwner = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrOwner()
+		mrOwnerConfig = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrOwnerConfig()
+		rtmrs = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetRtmrs()
+		reportData = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetReportData()
+		qeVendorID = q.GetHeader().GetQeVendorId()
+		minimumTeeTcbSvn2 = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn2()
+		mrServiceTd = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrServiceTd()
+
+	default:
+		return fmt.Errorf("unsupported quote type: %T", anyQuote)
+	}
+
+	byteMatchErr := multierr.Combine(
+		byteCheck("MrSeam", "MR_SEAM", abi.MrSeamSize, mrSeam, opts.TdQuoteBodyOptions.MrSeam),
+		byteCheck("TdAttributes", "TD_ATTRIBUTES", abi.TdAttributesSize, tdAttributes, opts.TdQuoteBodyOptions.TdAttributes),
+		byteCheck("Xfam", "XFAM", abi.XfamSize, xfam, opts.TdQuoteBodyOptions.Xfam),
+		byteCheck("MrTd", "MR_TD", abi.MrTdSize, mrTd, opts.TdQuoteBodyOptions.MrTd),
+		byteCheck("MrConfigID", "MR_CONFIG_ID", abi.MrConfigIDSize, mrConfigID, opts.TdQuoteBodyOptions.MrConfigID),
+		byteCheck("MrOwner", "MR_OWNER", abi.MrOwnerSize, mrOwner, opts.TdQuoteBodyOptions.MrOwner),
+		byteCheck("MrOwnerConfig", "MR_OWNER_CONFIG", abi.MrOwnerConfigSize, mrOwnerConfig, opts.TdQuoteBodyOptions.MrOwnerConfig),
+		byteCheckRtmr(abi.RtmrSize, rtmrs, opts.TdQuoteBodyOptions.Rtmrs),
+		byteCheckAny(abi.MrTdSize, mrTd, opts.TdQuoteBodyOptions.AnyMrTd),
+		byteCheck("ReportData", "REPORT_DATA", abi.ReportDataSize, reportData, opts.TdQuoteBodyOptions.ReportData),
+		byteCheck("QeVendorID", "QE_VENDOR_ID", abi.QeVendorIDSize, qeVendorID, opts.HeaderOptions.QeVendorID),
+	)
+	if byteMatchErr != nil {
+		return byteMatchErr
+	}
+	if !isTdx15Quote(anyQuote) {
+		return nil
+	}
+	byteMatchErr = multierr.Append(
+		byteCheck("MinimumTeeTcbSvn2", "MINIMUM_TEE_TCB_SVN2", abi.TeeTcbSvn2SizeV5, minimumTeeTcbSvn2, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2),
+		byteCheck("MrServiceTd", "MR_SERVICE_TD", abi.MrServiceTdSizeV5, mrServiceTd, opts.TdQuoteBodyOptions.MrServiceTd),
+	)
+	return byteMatchErr
+}
+
+func isTdx15Quote(quote any) bool {
+	switch q := quote.(type) {
+	case *pb.QuoteV5:
+		return q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyType() == 3
+	default:
+		return false
+	}
 }
 
 func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
@@ -252,20 +320,36 @@ func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
 	return true
 }
 
-func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
+func minVersionCheck(anyQuote any, opts *Options) error {
+	var teeTcbSvn, teeTcbSvn2 []byte
+	var header *pb.Header
+	var isV4 bool
+	switch q := anyQuote.(type) {
+	case *pb.QuoteV4:
+		header = q.GetHeader()
+		teeTcbSvn = q.GetTdQuoteBody().GetTeeTcbSvn()
+		isV4 = true
+	case *pb.QuoteV5:
+		header = q.GetHeader()
+		teeTcbSvn = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn()
+		teeTcbSvn2 = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn2()
+	default:
+		return fmt.Errorf("unsupported quote type: %T", anyQuote)
+	}
+
 	logger.V(1).Info("Setting the minimum_qe_svn parameter value to ", opts.HeaderOptions.MinimumQeSvn)
 	logger.V(1).Info("Setting the minimum_pce_svn parameter value to ", opts.HeaderOptions.MinimumPceSvn)
 	logger.V(1).Info("Setting the minimum_tee_tcb_svn parameter value to ", opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 
-	logger.V(2).Infof("TEE TCB security-version number is %v, and minimum_tee_tcb_svn value is %v", quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
-	if !isSvnHigherOrEqual(quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
+	logger.V(2).Infof("TEE TCB security-version number is %v, and minimum_tee_tcb_svn value is %v", teeTcbSvn, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
+	if !isSvnHigherOrEqual(teeTcbSvn, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn) {
 		return fmt.Errorf("TEE TCB security-version number %d is less than the required minimum %d",
-			quote.GetTdQuoteBody().GetTeeTcbSvn(), opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
+			teeTcbSvn, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn)
 	}
 
 	logger.V(1).Info("Successfully validated TEE TCB security-version number")
-	qeSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetQeSvn())
-	pceSvn := binary.LittleEndian.Uint16(quote.GetHeader().GetPceSvn())
+	qeSvn := binary.LittleEndian.Uint16(header.GetQeSvn())
+	pceSvn := binary.LittleEndian.Uint16(header.GetPceSvn())
 	logger.V(2).Infof("QE security-version number is %d, and minimum_qe_svn value is %d", qeSvn, opts.HeaderOptions.MinimumQeSvn)
 	if qeSvn < opts.HeaderOptions.MinimumQeSvn {
 		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
@@ -278,8 +362,23 @@ func minVersionCheck(quote *pb.QuoteV4, opts *Options) error {
 		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
 			pceSvn, opts.HeaderOptions.MinimumPceSvn)
 	}
+	if isV4 {
+		logger.V(1).Info("Successfully validated PCE security-version number")
+		return nil
+	}
 
-	logger.V(1).Info("Successfully validated PCE security-version number")
+	// V5 specific checks
+
+	if !isTdx15Quote(anyQuote) {
+		logger.V(1).Info("Skipping validation check for TEE TCB SVN2 field: QuoteV5 is a TDX1.0 quote")
+		return nil
+	}
+	logger.V(1).Infof("TEE TCB SVN2 security-version number is %v, and minimum_tee_tcb_svn2 value is %v", teeTcbSvn2, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2)
+	if !isSvnHigherOrEqual(teeTcbSvn2, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2) {
+		return fmt.Errorf("teeTcbSvn2 security-version number %d is less than the required minimum %d",
+			teeTcbSvn2, opts.TdQuoteBodyOptions.MinimumTeeTcbSvn2)
+	}
+	logger.V(1).Info("Successfully validated TEE TCB SVN2 security-version number")
 	return nil
 }
 
@@ -329,32 +428,34 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugChec
 }
 
 // TdxQuote validates fields of the protobuf representation of an attestation Quote
-// against expectations depending on supported quote formats - QuoteV4.
+// against expectations depending on supported quote formats - QuoteV4, QuoteV5.
 // Does not check the attestation certificates or signature.
 func TdxQuote(quote any, options *Options) error {
 	if options == nil {
 		return vr.ErrOptionsNil
 	}
+
+	if err := abi.CheckQuote(quote); err != nil {
+		return fmt.Errorf("quote invalid: %v", err)
+	}
+	logger.V(1).Info("Validating the TDX Quote using input parameters")
+
+	var xfam, tdAttributes []byte
 	switch q := quote.(type) {
 	case *pb.QuoteV4:
-		return tdxQuoteV4(q, options)
+		xfam = q.GetTdQuoteBody().GetXfam()
+		tdAttributes = q.GetTdQuoteBody().GetTdAttributes()
+	case *pb.QuoteV5:
+		xfam = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetXfam()
+		tdAttributes = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTdAttributes()
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
-}
-
-// tdxQuoteV4 validates QuoteV4 fields of the protobuf representation of an attestation Quote
-// against expectations. Does not check the attestation certificates or signature.
-func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
-	if err := abi.CheckQuote(quote); err != nil {
-		return fmt.Errorf("QuoteV4 invalid: %v", err)
-	}
-	logger.V(1).Info("Validating the TDX Quote using input parameters")
 	return multierr.Combine(
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
-		validateXfam(quote.GetTdQuoteBody().GetXfam(), xfamFixed1, xfamFixed0),
-		validateTdAttributes(quote.GetTdQuoteBody().GetTdAttributes(), tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck),
+		validateXfam(xfam, xfamFixed1, xfamFixed0),
+		validateTdAttributes(tdAttributes, tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck),
 	)
 }
 
