@@ -26,7 +26,7 @@ var RawQuote []byte
 
 // RawQuoteV5 contains raw bytes of quote v5. To be used only for testing
 //
-//go:embed "quote_v5_sample.dat"
+//go:embed "quote_sample_v5.dat"
 var RawQuoteV5 []byte
 
 // RawReport contains raw bytes of report. To be used only for testing

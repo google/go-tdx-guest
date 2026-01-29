@@ -633,51 +633,6 @@ func TestVerifyUsingTcbInfoV5(t *testing.T) {
 	}
 }
 
-func TestVerifyUsingTcbInfoV5(t *testing.T) {
-	getter := testcases.TestGetter
-
-	anyQuote, err := abi.QuoteToProto(testdata.RawQuoteV5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	chain, err := ExtractChainFromQuote(anyQuote)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ext, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmspc := ext.FMSPC
-	collateral := &Collateral{}
-
-	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
-		t.Fatal(err)
-	}
-	tcbInfo := collateral.TdxTcbInfo.TcbInfo
-
-	quote, ok := anyQuote.(*pb.QuoteV5)
-	if !ok {
-		t.Fatal("quote is not a QuoteV5")
-	}
-	tdQuoteBody := quote.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5()
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Error(err)
-	}
-
-	// Convert fmspc value to uppercase.
-	tcbInfo.Fmspc = strings.ToUpper(tcbInfo.Fmspc)
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Errorf("verifyTdQuoteBody() failed with upppercased FMSPC value: %v", err)
-	}
-
-	// Convert fmspc value to lowercase.
-	tcbInfo.Fmspc = strings.ToLower(tcbInfo.Fmspc)
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Errorf("verifyTdQuoteBody() failed with lowercased FMSPC value: %v", err)
-	}
-}
-
 func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	getter := testcases.TestGetter
 

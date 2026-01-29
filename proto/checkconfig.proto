@@ -53,6 +53,8 @@ message TDQuoteBodyPolicy {
   bytes report_data = 10;         // should be 64 bytes
   repeated bytes any_mr_td = 11;  // each should be 48 bytes.
   bool enable_td_debug_check = 12; // if true, check that the DEBUG bit is 0 in TDAttributes.
+  bytes minimum_tee_tcb_svn2 = 13;  // should be 16 bytes
+  bytes mr_service_td = 14;         // should be 48 bytes
 }
 
 // RootOfTrust represents configuration for which hardware root of trust
