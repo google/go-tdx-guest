@@ -129,6 +129,59 @@ func TestQuoteToAbiBytes(t *testing.T) {
 	}
 }
 
+func TestCheckQuote(t *testing.T) {
+	quoteV4, err := QuoteToProto(test.RawQuote)
+	if err != nil {
+		t.Fatalf("failed to parse RawQuote: %v", err)
+	}
+
+	quoteV5, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		t.Fatalf("failed to parse RawQuoteV5: %v", err)
+	}
+
+	tcs := []struct {
+		name    string
+		quote   any
+		wantErr string
+	}{
+		{
+			name:    "empty quoteV4",
+			quote:   &pb.QuoteV4{},
+			wantErr: "QuoteV4 Header error: header is nil",
+		},
+		{
+			name:    "empty quoteV5",
+			quote:   &pb.QuoteV5{},
+			wantErr: "quoteV5 Header error: header is nil",
+		},
+		{
+			name:    "correct quoteV4",
+			quote:   quoteV4,
+			wantErr: "",
+		},
+		{
+			name:    "correct quoteV5",
+			quote:   quoteV5,
+			wantErr: "",
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckQuote(tc.quote)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Errorf("CheckQuote() returned error %v, want nil", err)
+				}
+				return
+			}
+			if err == nil || err.Error() != tc.wantErr {
+				t.Errorf("CheckQuote() returned error %v, want %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestNilToAbiBytesConversions(t *testing.T) {
 	tcs := []struct {
 		name string
