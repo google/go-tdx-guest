@@ -633,51 +633,6 @@ func TestVerifyUsingTcbInfoV5(t *testing.T) {
 	}
 }
 
-func TestVerifyUsingTcbInfoV5(t *testing.T) {
-	getter := testcases.TestGetter
-
-	anyQuote, err := abi.QuoteToProto(testdata.RawQuoteV5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	chain, err := ExtractChainFromQuote(anyQuote)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ext, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fmspc := ext.FMSPC
-	collateral := &Collateral{}
-
-	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
-		t.Fatal(err)
-	}
-	tcbInfo := collateral.TdxTcbInfo.TcbInfo
-
-	quote, ok := anyQuote.(*pb.QuoteV5)
-	if !ok {
-		t.Fatal("quote is not a QuoteV5")
-	}
-	tdQuoteBody := quote.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5()
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Error(err)
-	}
-
-	// Convert fmspc value to uppercase.
-	tcbInfo.Fmspc = strings.ToUpper(tcbInfo.Fmspc)
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Errorf("verifyTdQuoteBody() failed with upppercased FMSPC value: %v", err)
-	}
-
-	// Convert fmspc value to lowercase.
-	tcbInfo.Fmspc = strings.ToLower(tcbInfo.Fmspc)
-	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
-		t.Errorf("verifyTdQuoteBody() failed with lowercased FMSPC value: %v", err)
-	}
-}
-
 func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	getter := testcases.TestGetter
 
@@ -1104,6 +1059,137 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 			t.Fatal("SupportedTcbLevelsFromCollateral() didn't return an error when TcbLevels were missing")
 		}
 	})
+}
+
+func TestDetermineRelaunchAdvised(t *testing.T) {
+	tcbInfo := pcs.TcbInfo{
+		TcbLevels: []pcs.TcbLevel{
+			{
+				Tcb: pcs.Tcb{
+					TdxTcbcomponents: []pcs.TcbComponent{
+						{Svn: 1},
+						{Svn: 2},
+						{Svn: 3},
+					},
+				},
+			},
+		},
+		TdxModuleIdentities: []pcs.TdxModuleIdentity{
+			{
+				ID: "TDX_01",
+				TcbLevels: []pcs.TcbLevel{
+					{
+						Tcb: pcs.Tcb{Isvsvn: 5},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                  string
+		teeTcbSvn2            []byte
+		matchedTCbLevelStatus pcs.TcbComponentStatus
+		tdxModuleTcbStatus    pcs.TcbComponentStatus
+		tcbInfo               pcs.TcbInfo
+		wantErr               string
+	}{
+		{
+			name:                  "Nil teeTcbSvn2",
+			teeTcbSvn2:            nil,
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               "",
+		},
+		{
+			name:                  "TcbComponentStatus UpToDate",
+			teeTcbSvn2:            []byte{1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusUpToDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               "",
+		},
+		{
+			name:                  "teeTcbSvn2[1]=0 relaunch advised without config",
+			teeTcbSvn2:            []byte{1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               ErrTcbTdRelaunchAdvised.Error(),
+		},
+		{
+			name:                  "teeTcbSvn2[1]=0 relaunch with config changes",
+			teeTcbSvn2:            []byte{1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			matchedTCbLevelStatus: pcs.TcbComponentStatusConfigurationNeeded,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               ErrTcbTdRelaunchAdvicedConfiguratonNeeded.Error(),
+		},
+		{
+			name:                  "teeTcbSvn2[1]=0 relaunch with config from tdxModule",
+			teeTcbSvn2:            []byte{1, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDateConfigurationNeeded,
+			tcbInfo:               tcbInfo,
+			wantErr:               ErrTcbTdRelaunchAdvicedConfiguratonNeeded.Error(),
+		},
+		{
+			name:                  "teeTcbSvn2[1]=0 no relaunch conditions should succeed",
+			teeTcbSvn2:            []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               "",
+		},
+		{
+			name:                  "teeTcbSvn2[1]!=0 relaunch advised",
+			teeTcbSvn2:            []byte{5, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // ID matching will look for TDX_01
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               ErrTcbTdRelaunchAdvised.Error(),
+		},
+		{
+			name:                  "teeTcbSvn2[1]!=0 relaunch with config changes advised",
+			teeTcbSvn2:            []byte{5, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // ID matching will look for TDX_01
+			matchedTCbLevelStatus: pcs.TcbComponentStatusConfigurationNeeded,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               ErrTcbTdRelaunchAdvicedConfiguratonNeeded.Error(),
+		},
+		{
+			name:                  "teeTcbSvn2[1]!=0 module id mismatch ",
+			teeTcbSvn2:            []byte{5, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // ID matching will look for TDX_02
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               "could not find a TDX Module Identity (\"TDX_02\") matching the given TEE TDX version (\"\\x02\")",
+		},
+		{
+			name:                  "teeTcbSvn2[1]!=0 no relaunch conditions met",
+			teeTcbSvn2:            []byte{5, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // teeTcbSvn2[2] (2) < latestTcbLevel.Tcb.TdxTcbcomponents[2].Svn (3)
+			matchedTCbLevelStatus: pcs.TcbComponentStatusUpToDate,
+			tdxModuleTcbStatus:    pcs.TcbComponentStatusOutOfDate,
+			tcbInfo:               tcbInfo,
+			wantErr:               "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := determineRelaunchAdvised(tc.teeTcbSvn2, tc.matchedTCbLevelStatus, tc.tdxModuleTcbStatus, tc.tcbInfo)
+			if err == nil {
+				if tc.wantErr != "" {
+					t.Errorf("determineRelaunchAdvised() = nil, want %v", tc.wantErr)
+				}
+			} else {
+				if err.Error() != tc.wantErr {
+					t.Errorf("determineRelaunchAdvised() = %v, want %v", err, tc.wantErr)
+				}
+			}
+		})
+	}
 }
 
 var rawTdxQuoteFuncs = map[string]func([]byte, *Options) error{
