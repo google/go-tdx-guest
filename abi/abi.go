@@ -335,7 +335,7 @@ func quoteToProtoV4(b []uint8) (*pb.QuoteV4, error) {
 		quote.ExtraBytes = extraBytes
 	}
 
-	if err := CheckQuoteV4(quote); err != nil {
+	if err := CheckQuote(quote); err != nil {
 		return nil, fmt.Errorf("parsing QuoteV4 failed: %v", err)
 	}
 	return quote, nil
@@ -387,7 +387,7 @@ func quoteToProtoV5(b []uint8) (*pb.QuoteV5, error) {
 	if len(extraBytes) > 0 {
 		quote.ExtraBytes = extraBytes
 	}
-	if err := CheckQuoteV5(quote); err != nil {
+	if err := CheckQuote(quote); err != nil {
 		return nil, fmt.Errorf("parsing QuoteV5 failed: %v", err)
 	}
 	return quote, nil
@@ -892,8 +892,19 @@ func checkEcdsa256BitQuoteV4AuthData(signedData *pb.Ecdsa256BitQuoteV4AuthData) 
 	return nil
 }
 
-// CheckQuoteV4  validates a quote protobuf by ensuring all parameters meet their required size
-func CheckQuoteV4(quote *pb.QuoteV4) error {
+// CheckQuote validates a quote protobuf by ensuring all parameters meet their required size
+func CheckQuote(quote any) error {
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		return checkQuoteV4(q)
+	case *pb.QuoteV5:
+		return checkQuoteV5(q)
+	default:
+		return fmt.Errorf("unsupported quote type: %T", quote)
+	}
+}
+
+func checkQuoteV4(quote *pb.QuoteV4) error {
 	if quote == nil {
 		return ErrQuoteV4Nil
 	}
@@ -910,8 +921,7 @@ func CheckQuoteV4(quote *pb.QuoteV4) error {
 	return nil
 }
 
-// CheckQuoteV5 validates a QuoteV5 protobuf by ensuring all parameters meet their required size
-func CheckQuoteV5(quote *pb.QuoteV5) error {
+func checkQuoteV5(quote *pb.QuoteV5) error {
 	if quote == nil {
 		return ErrQuoteV5Nil
 	}
@@ -1152,7 +1162,7 @@ func QuoteToAbiBytes(quote any) ([]byte, error) {
 
 // quoteToAbiBytesV4 translates the QuoteV4 back into its little-endian ABI format
 func quoteToAbiBytesV4(quote *pb.QuoteV4) ([]byte, error) {
-	if err := CheckQuoteV4(quote); err != nil {
+	if err := CheckQuote(quote); err != nil {
 		return nil, fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
 	var data []byte
@@ -1186,7 +1196,7 @@ func quoteToAbiBytesV4(quote *pb.QuoteV4) ([]byte, error) {
 }
 
 func quoteToAbiBytesV5(quote *pb.QuoteV5) ([]byte, error) {
-	if err := CheckQuoteV5(quote); err != nil {
+	if err := CheckQuote(quote); err != nil {
 		return nil, fmt.Errorf("quoteV5 invalid: %v", err)
 	}
 	var data []byte
