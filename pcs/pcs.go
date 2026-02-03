@@ -221,6 +221,8 @@ const (
 	TcbComponentStatusOutOfDateConfigurationNeeded TcbComponentStatus = "OutOfDateConfigurationNeeded"
 	// TcbComponentStatusRevoked denotes tcb status as Revoked
 	TcbComponentStatusRevoked TcbComponentStatus = "Revoked"
+	// TcbComponentStatusRelaunchAdvisedConfigurationNeeded denotes tcb status as RelaunchAdvisedConfigurationNeeded
+	TcbComponentStatusRelaunchAdvisedConfigurationNeeded TcbComponentStatus = "RelaunchAdvisedConfigurationNeeded"
 )
 
 // UnmarshalJSON for TcbComponentStatus maps tcb status to corresponding valid strings

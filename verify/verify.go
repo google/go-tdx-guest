@@ -1029,32 +1029,40 @@ func getTeeTcbSvn(tdQuoteBody any) ([]byte, []byte, error) {
 	return teeTcbSvn, teeTcbSvn2, nil
 }
 
-func readTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions) (pcs.TcbLevel, error) {
+func readTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions) (pcs.TcbLevel, pcs.TcbLevel, error) {
 	tcbLevels := tcbInfo.TcbLevels
 	matchingTcbLevel, err := getMatchingTcbLevel(tcbLevels, tdQuoteBody, pckCertExtensions.TCB.PCESvn, pckCertExtensions.TCB.CPUSvnComponents)
 	if err != nil {
-		return pcs.TcbLevel{}, err
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, err
 	}
 	logger.V(2).Info("Matching TCB Level found: ", matchingTcbLevel)
 	teeTcbSvn, _, err := getTeeTcbSvn(tdQuoteBody)
 	if err != nil {
-		return pcs.TcbLevel{}, err
+		return pcs.TcbLevel{}, pcs.TcbLevel{}, err
 	}
 	if teeTcbSvn[1] > 0 {
 		matchingTdxModuleTcbLevel, err := getMatchingTdxModuleTcbLevel(tcbInfo.TdxModuleIdentities, teeTcbSvn)
 		if err != nil {
-			return pcs.TcbLevel{}, err
+			return pcs.TcbLevel{}, pcs.TcbLevel{}, err
 		}
 		logger.V(2).Info("Tdx Module TCB Status found: ", matchingTdxModuleTcbLevel.TcbStatus)
-		return *matchingTdxModuleTcbLevel, nil
+		return matchingTcbLevel, *matchingTdxModuleTcbLevel, nil
 	}
 
 	logger.V(2).Info("TCB Status found: ", matchingTcbLevel.TcbStatus)
-	return matchingTcbLevel, nil
+	return matchingTcbLevel, pcs.TcbLevel{}, nil
+}
+
+func isConfigurationNeeded(status pcs.TcbComponentStatus) bool {
+	return status == pcs.TcbComponentStatusConfigurationNeeded || status == pcs.TcbComponentStatusConfigurationAndSWHardeningNeeded || status == pcs.TcbComponentStatusOutOfDateConfigurationNeeded || status == pcs.TcbComponentStatusRelaunchAdvisedConfigurationNeeded
 }
 
 func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions) error {
-	found, err := readTcbInfoTcbStatus(tcbInfo, tdQuoteBody, pckCertExtensions)
+	teeTcbSvn, teeTcbSvn2, err := getTeeTcbSvn(tdQuoteBody)
+	if err != nil {
+		return err
+	}
+	found, tdxModuleFound, err := readTcbInfoTcbStatus(tcbInfo, tdQuoteBody, pckCertExtensions)
 	if err != nil {
 		return err
 	}
@@ -1062,7 +1070,36 @@ func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensio
 	if found.TcbStatus == pcs.TcbComponentStatusOutOfDate {
 		return ErrTdxTcbStatus
 	}
+	tdxModuleTcbStatus := pcs.TcbComponentStatusUpToDate
+	if teeTcbSvn[1] > 0 {
+		tdxModuleTcbStatus = tdxModuleFound.TcbStatus
+	}
 
+	if teeTcbSvn2 != nil && (tdxModuleTcbStatus == pcs.TcbComponentStatusOutOfDate || tdxModuleTcbStatus == pcs.TcbComponentStatusOutOfDateConfigurationNeeded) {
+		latestTcbLevel := tcbInfo.TcbLevels[0]
+
+		if teeTcbSvn2[1] == 0 {
+			if teeTcbSvn2[0] >= latestTcbLevel.Tcb.TdxTcbcomponents[0].Svn && teeTcbSvn2[2] >= latestTcbLevel.Tcb.TdxTcbcomponents[2].Svn {
+				if isConfigurationNeeded(found.TcbStatus) || isConfigurationNeeded(tdxModuleTcbStatus) {
+					return fmt.Errorf("relaunch advised with a configuration needed status for TDX module")
+				}
+
+				return fmt.Errorf("relaunch advised status for TDX module")
+			}
+
+		} else {
+			tdxModuleIdentity2, err := getMatchingTdxModuleTcbLevel(tcbInfo.TdxModuleIdentities, teeTcbSvn2)
+			if err != nil {
+				return err
+			}
+			if uint32(teeTcbSvn2[0]) >= tdxModuleIdentity2.Tcb.Isvsvn && teeTcbSvn2[2] >= latestTcbLevel.Tcb.TdxTcbcomponents[2].Svn {
+				if isConfigurationNeeded(tdxModuleTcbStatus) || isConfigurationNeeded(found.TcbStatus) {
+					return fmt.Errorf("relaunch advised with a configuration needed status for TDX module")
+				}
+				return fmt.Errorf("relaunch advised status for TDX module")
+			}
+		}
+	}
 	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
 		return fmt.Errorf("TDX TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
 	}
@@ -1240,6 +1277,16 @@ func verifyQuote(quote any, options *Options) error {
 	logger.V(1).Info("QE Report Data verified successfully")
 
 	if collateral != nil {
+
+		logger.V(1).Info("Verifying QE Report using QE Identity API response")
+		if err := verifyQeReport(qeReportCertificationData.GetQeReport(),
+			&qeReportOptions{
+				qeIdentity: &collateral.QeIdentity.EnclaveIdentity,
+			}); err != nil {
+			return err
+		}
+		logger.V(1).Info("QE Report verified successfully")
+
 		logger.V(1).Info("Verifying TD Quote Body using TCB Info API response")
 		var err error
 		switch q := quote.(type) {
@@ -1262,14 +1309,6 @@ func verifyQuote(quote any, options *Options) error {
 			return err
 		}
 		logger.V(1).Info("TD Quote Body verified successfully")
-		logger.V(1).Info("Verifying QE Report using QE Identity API response")
-		if err := verifyQeReport(qeReportCertificationData.GetQeReport(),
-			&qeReportOptions{
-				qeIdentity: &collateral.QeIdentity.EnclaveIdentity,
-			}); err != nil {
-			return err
-		}
-		logger.V(1).Info("QE Report verified successfully")
 	}
 
 	return nil
@@ -1476,8 +1515,9 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 	}
 
 	var (
-		foundTcbInfo pcs.TcbLevel
-		tcbErr       error
+		foundTcbInfo, foundTdxModuleTcbLevel pcs.TcbLevel
+		tcbErr                               error
+		teeTcbSvn                            []byte
 	)
 
 	signedData, err := getSignedData(quote)
@@ -1487,14 +1527,19 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 
 	switch q := quote.(type) {
 	case *pb.QuoteV4:
-		foundTcbInfo, tcbErr = readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBody(), options.pckCertExtensions)
+		teeTcbSvn = q.GetTdQuoteBody().GetTeeTcbSvn()
+		foundTcbInfo, foundTdxModuleTcbLevel, tcbErr = readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBody(), options.pckCertExtensions)
 	case *pb.QuoteV5:
-		foundTcbInfo, tcbErr = readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5(), options.pckCertExtensions)
+		teeTcbSvn = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn()
+		foundTcbInfo, foundTdxModuleTcbLevel, tcbErr = readTcbInfoTcbStatus(options.collateral.TdxTcbInfo.TcbInfo, q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5(), options.pckCertExtensions)
 	default:
 		return pcs.TcbLevel{}, pcs.TcbLevel{}, fmt.Errorf("unsupported quote type %T", quote)
 	}
 	if tcbErr != nil {
 		err = multierr.Combine(err, tcbErr)
+	}
+	if teeTcbSvn[1] > 0 {
+		foundTcbInfo = foundTdxModuleTcbLevel
 	}
 
 	foundQe, qeErr := readQeTcbStatus(options.collateral.QeIdentity.EnclaveIdentity.TcbLevels, signedData.GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
