@@ -283,6 +283,18 @@ func TestRawQuoteVerifyWithoutCollateral(t *testing.T) {
 	}
 }
 
+func TestRawQuoteV5VerifyWithoutCollateral(t *testing.T) {
+	currentTime := time.Date(2026, time.February, 3, 1, 0, 0, 0, time.UTC)
+	options := &Options{CheckRevocations: false, GetCollateral: false, Now: testTimeSet(currentTime)}
+	for name, rawTdxQuote := range rawTdxQuoteFuncs {
+		t.Run(name, func(t *testing.T) {
+			if err := rawTdxQuote(testdata.RawQuoteV5, options); err != nil {
+				t.Errorf("%s() returned unexpected error: %v", name, err)
+			}
+		})
+	}
+}
+
 func TestRawQuoteVerifyWithoutCollateralAndCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -311,6 +323,26 @@ func TestVerifyQuoteV4(t *testing.T) {
 	}
 }
 
+func TestVerifyQuoteV5(t *testing.T) {
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuoteV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV5)
+	if !ok {
+		t.Fatal("Quote is not a QuoteV5")
+	}
+	pckChain, err := ExtractChainFromQuote(anyQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	currentTime := time.Date(2026, time.February, 3, 1, 0, 0, 0, time.UTC)
+	options := &Options{CheckRevocations: false, GetCollateral: false, chain: pckChain, Now: testTimeSet(currentTime)}
+	if err := verifyQuote(quote, options); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestNegativeVerification(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -322,13 +354,13 @@ func TestNegativeVerification(t *testing.T) {
 			name:        "Version byte Changed",
 			changeIndex: 0x00,
 			changeValue: 3,
-			wantErr:     "could not convert raw bytes to QuoteV4: quote format not supported",
+			wantErr:     "could not convert raw bytes to Quote: quote format not supported",
 		},
 		{
 			name:        "Signed data size byte Changed",
 			changeIndex: 0x278,
 			changeValue: 0x10,
-			wantErr:     "could not convert raw bytes to QuoteV4: size of certificate data is 0xf8a. Expected size 0x1045",
+			wantErr:     "could not convert raw bytes to Quote: size of certificate data is 0xf8a. Expected size 0x1045",
 		},
 		{
 			name:        "Certificate chain byte Changed",
@@ -532,6 +564,51 @@ func TestVerifyUsingTcbInfoV4(t *testing.T) {
 	}
 }
 
+func TestVerifyUsingTcbInfoV5(t *testing.T) {
+	getter := testcases.TestGetter
+
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuoteV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain, err := ExtractChainFromQuote(anyQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmspc := ext.FMSPC
+	collateral := &Collateral{}
+
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
+		t.Fatal(err)
+	}
+	tcbInfo := collateral.TdxTcbInfo.TcbInfo
+
+	quote, ok := anyQuote.(*pb.QuoteV5)
+	if !ok {
+		t.Fatal("quote is not a QuoteV5")
+	}
+	tdQuoteBody := quote.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5()
+	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
+		t.Error(err)
+	}
+
+	// Convert fmspc value to uppercase.
+	tcbInfo.Fmspc = strings.ToUpper(tcbInfo.Fmspc)
+	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
+		t.Errorf("verifyTdQuoteBody() failed with upppercased FMSPC value: %v", err)
+	}
+
+	// Convert fmspc value to lowercase.
+	tcbInfo.Fmspc = strings.ToLower(tcbInfo.Fmspc)
+	if err := verifyTdQuoteBody(tdQuoteBody, &tdQuoteBodyOptions{tcbInfo: tcbInfo, pckCertExtensions: ext}); err != nil {
+		t.Errorf("verifyTdQuoteBody() failed with lowercased FMSPC value: %v", err)
+	}
+}
+
 func TestNegativeVerifyUsingTcbInfoV4(t *testing.T) {
 	getter := testcases.TestGetter
 
@@ -610,6 +687,34 @@ func TestVerifyUsingQeIdentityV4(t *testing.T) {
 	qeIdentity := collateral.QeIdentity.EnclaveIdentity
 	qeReport := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport()
 
+	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &qeIdentity}); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestVerifyUsingQeIdentityV5(t *testing.T) {
+	getter := testcases.TestGetter
+
+	collateral := &Collateral{}
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
+		t.Fatal(err)
+	}
+
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuoteV5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV5)
+	if !ok {
+		t.Fatal("quote is not a QuoteV5")
+	}
+
+	qeIdentity := collateral.QeIdentity.EnclaveIdentity
+	qeReport := quote.GetSignedData().GetCertificationData().GetQeReportCertificationData().GetQeReport()
+
+	// There is no specific URL for getting QE Identity response from testdata in order to create a separate response for v5,
+	// hence to utilise existing response for testing, we are updating the ISVSVN value in the response to match the ISVSVN value in the quote.
+	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 1
 	if err := verifyQeReport(qeReport, &qeReportOptions{qeIdentity: &qeIdentity}); err != nil {
 		t.Error(err)
 	}
