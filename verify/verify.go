@@ -1405,6 +1405,19 @@ func SupportedTcbLevelsFromCollateral(quote any, options *Options) (pcs.TcbLevel
 	}
 }
 
+// GetPPID extracts the PPID from the PCK certificate chain in the quote.
+func GetPPID(quote any) (string, error) {
+	chain, err := ExtractChainFromQuote(quote)
+	if err != nil {
+		return "", err
+	}
+	exts, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
+	if err != nil {
+		return "", err
+	}
+	return exts.PPID, nil
+}
+
 // tdxQuoteV4 verifies the QuoteV4 protobuf representation of an attestation quote's signature
 // based on the quote's SignatureAlgo, provided the certificate chain is valid.
 func tdxQuoteV4(ctx context.Context, quote *pb.QuoteV4, options *Options) error {
