@@ -932,6 +932,24 @@ func TestSupportedTcbLevelsFromCollateral(t *testing.T) {
 	})
 }
 
+func TestGetPPID(t *testing.T) {
+	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ppid, err := GetPPID(quote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The PPID is bytes 89d... which is hex encoded in pcs.PckExtensions
+	// In TestPckCertificateExtensions, expected ppidBytes is []byte{8, 157, 223, 219, 156, 3, 89, 200, 42, 59, 199, 113, 146, 57, 87, 78}
+	// Hex: 089ddfdb9c0359c82a3bc7719239574e
+	wantPPID := "089ddfdb9c0359c82a3bc7719239574e"
+	if ppid != wantPPID {
+		t.Errorf("GetPPID() = %q, want %q", ppid, wantPPID)
+	}
+}
+
 var rawTdxQuoteFuncs = map[string]func([]byte, *Options) error{
 	"RawTdxQuote": RawTdxQuote,
 	"RawTdxQuoteContext": func(quote []byte, options *Options) error {
