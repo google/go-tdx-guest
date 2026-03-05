@@ -346,7 +346,7 @@ func TdxQuote(quote any, options *Options) error {
 // tdxQuoteV4 validates QuoteV4 fields of the protobuf representation of an attestation Quote
 // against expectations. Does not check the attestation certificates or signature.
 func tdxQuoteV4(quote *pb.QuoteV4, options *Options) error {
-	if err := abi.CheckQuoteV4(quote); err != nil {
+	if err := abi.CheckQuote(quote); err != nil {
 		return fmt.Errorf("QuoteV4 invalid: %v", err)
 	}
 	logger.V(1).Info("Validating the TDX Quote using input parameters")

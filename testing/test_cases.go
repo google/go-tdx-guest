@@ -58,6 +58,10 @@ var TestGetter = &Getter{
 			Header: TcbInfoHeader,
 			Body:   testdata.TcbInfoBody,
 		},
+		"https://api.trustedservices.intel.com/tdx/certification/v4/tcb?fmspc=90c06f000000": {
+			Header: TcbInfoHeader,
+			Body:   testdata.TcbInfoBodyV5,
+		},
 		"https://api.trustedservices.intel.com/sgx/certification/v4/pckcrl?ca=platform&encoding=der": {
 			Header: PckCrlHeader,
 			Body:   testdata.PckCrlBody,
