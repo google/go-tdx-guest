@@ -154,5 +154,5 @@ func fallbackToDeviceForRawQuote(reportData [64]byte) ([]uint8, error) {
 }
 
 func init() {
-	logger.Init("", false, false, os.Stdout)
+	logger.Init("", false, false, os.Stderr)
 }
