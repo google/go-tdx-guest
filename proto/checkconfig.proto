@@ -75,6 +75,12 @@ message RootOfTrust {
   // If true, then check is not permitted to download necessary files for
   // verification.
   bool get_collateral = 4;
+
+  // The set of acceptable TCB status values. If empty, only "UpToDate" is
+  // accepted. Possible values: "UpToDate", "SWHardeningNeeded",
+  // "ConfigurationNeeded", "ConfigurationAndSWHardeningNeeded", "OutOfDate",
+  // "OutOfDateConfigurationNeeded".
+  repeated string accepted_tcb_statuses = 5;
 }
 
 // Config is the overall message input for the check tool. This provides all

@@ -18,7 +18,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/hex"
-	"errors"
 	"os"
 	"reflect"
 	"strings"
@@ -824,25 +823,26 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 
 	setTcbSvnValues(10, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
 	wantErr := "no matching TCB level found"
-	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext, nil); err == nil || err.Error() != wantErr {
 		t.Errorf("SgxTcbComponents values greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	setTcbSvnValues(0, 10, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
-	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext, nil); err == nil || err.Error() != wantErr {
 		t.Errorf("TdxTcbComponents values greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 20
 	setTcbSvnValues(0, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
-	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext); err == nil || err.Error() != wantErr {
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext, nil); err == nil || err.Error() != wantErr {
 		t.Errorf("PCESvn value greater: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 0
 	tcbInfo.TcbLevels[0].TcbStatus = "OutOfDate"
-	if gotErr, wantErr := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext), ErrTdxTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
-		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
+	wantErrOutOfDate := `TDX TCB Status "OutOfDate" is not acceptable`
+	if err := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext, nil); err == nil || err.Error() != wantErrOutOfDate {
+		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErrOutOfDate)
 	}
 }
 
@@ -867,14 +867,15 @@ func TestNegativeCheckQeStatusV4(t *testing.T) {
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 10
 	wantErr := "no matching QE TCB level found"
-	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err == nil || err.Error() != wantErr {
+	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn(), nil); err == nil || err.Error() != wantErr {
 		t.Errorf("No matching TCB level: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
 	}
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 0
 	qeIdentity.TcbLevels[0].TcbStatus = "OutOfDate"
-	if gotErr, wantErr := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()), ErrEnclaveTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
-		t.Errorf("TCB status expired: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
+	wantErrOutOfDate := `QE TCB Status "OutOfDate" is not acceptable`
+	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn(), nil); err == nil || err.Error() != wantErrOutOfDate {
+		t.Errorf("TCB status expired: verifyUsingQeIdentity() = %v. Want error %v", err, wantErrOutOfDate)
 	}
 }
 

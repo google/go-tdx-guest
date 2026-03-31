@@ -190,6 +190,9 @@ type Options struct {
 	// TrustedRoots specifies the root CertPool to trust when verifying PCK certificate chain.
 	// If nil, embedded certificate will be used
 	TrustedRoots *x509.CertPool
+	// AcceptedTCBStatuses is the set of TCB status values that the caller considers acceptable.
+	// If nil or empty, only "UpToDate" is accepted.
+	AcceptedTCBStatuses []pcs.TcbComponentStatus
 
 	chain             *PCKCertificateChain
 	collateral        *Collateral
@@ -224,12 +227,14 @@ func DefaultOptions() *Options {
 }
 
 type tdQuoteBodyOptions struct {
-	tcbInfo           pcs.TcbInfo
-	pckCertExtensions *pcs.PckExtensions
+	tcbInfo             pcs.TcbInfo
+	pckCertExtensions   *pcs.PckExtensions
+	acceptedTCBStatuses []pcs.TcbComponentStatus
 }
 
 type qeReportOptions struct {
-	qeIdentity *pcs.EnclaveIdentity
+	qeIdentity          *pcs.EnclaveIdentity
+	acceptedTCBStatuses []pcs.TcbComponentStatus
 }
 
 // PCKCertificateChain contains certificate chains
@@ -997,18 +1002,26 @@ func readQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) (pcs.TcbLevel, err
 	return pcs.TcbLevel{}, fmt.Errorf("no matching QE TCB level found")
 }
 
-func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32) error {
+func isTcbStatusAccepted(status pcs.TcbComponentStatus, accepted []pcs.TcbComponentStatus) bool {
+	if len(accepted) == 0 {
+		return status == pcs.TcbComponentStatusUpToDate
+	}
+	for _, s := range accepted {
+		if s == status {
+			return true
+		}
+	}
+	return false
+}
+
+func checkQeTcbStatus(tcbLevels []pcs.TcbLevel, isvsvn uint32, accepted []pcs.TcbComponentStatus) error {
 	found, err := readQeTcbStatus(tcbLevels, isvsvn)
 	if err != nil {
 		return err
 	}
 
-	if found.TcbStatus == pcs.TcbComponentStatusOutOfDate {
-		return ErrEnclaveTcbStatus
-	}
-
-	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
-		return fmt.Errorf("QE TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
+	if !isTcbStatusAccepted(found.TcbStatus, accepted) {
+		return fmt.Errorf("QE TCB Status %q is not acceptable", found.TcbStatus)
 	}
 
 	return nil
@@ -1052,18 +1065,14 @@ func readTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtension
 	return matchingTcbLevel, nil
 }
 
-func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions) error {
+func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensions *pcs.PckExtensions, accepted []pcs.TcbComponentStatus) error {
 	found, err := readTcbInfoTcbStatus(tcbInfo, tdQuoteBody, pckCertExtensions)
 	if err != nil {
 		return err
 	}
 
-	if found.TcbStatus == pcs.TcbComponentStatusOutOfDate {
-		return ErrTdxTcbStatus
-	}
-
-	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
-		return fmt.Errorf("TDX TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
+	if !isTcbStatusAccepted(found.TcbStatus, accepted) {
+		return fmt.Errorf("TDX TCB Status %q is not acceptable", found.TcbStatus)
 	}
 
 	return nil
@@ -1111,7 +1120,7 @@ func verifyTdQuoteBody(tdQuoteBody any, tdQuoteBodyOptions *tdQuoteBodyOptions) 
 		return fmt.Errorf("AttributesMask value(%q) is not equal to TdxModule.Attributes field in Intel PCS's reported TDX TCB info(%q)", hex.EncodeToString(attributesMask), hex.EncodeToString(tdQuoteBodyOptions.tcbInfo.TdxModule.Attributes.Bytes))
 	}
 
-	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions); err != nil {
+	if err := checkTcbInfoTcbStatus(tdQuoteBodyOptions.tcbInfo, tdQuoteBody, tdQuoteBodyOptions.pckCertExtensions, tdQuoteBodyOptions.acceptedTCBStatuses); err != nil {
 		return fmt.Errorf("TDX TCB info reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
@@ -1154,7 +1163,7 @@ func verifyQeReport(qeReport *pb.EnclaveReport, qeReportOptions *qeReportOptions
 		return fmt.Errorf("ISV PRODID value(%v) in QE Report is not equal to ISV PRODID value(%v) in Intel PCS's reported QE Identity", qeReport.GetIsvProdId(), qeReportOptions.qeIdentity.IsvProdID)
 	}
 
-	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err != nil {
+	if err := checkQeTcbStatus(qeReportOptions.qeIdentity.TcbLevels, qeReport.GetIsvSvn(), qeReportOptions.acceptedTCBStatuses); err != nil {
 		return fmt.Errorf("QE Identity reported by Intel PCS failed TCB status check: %v", err)
 	}
 	return nil
@@ -1242,7 +1251,7 @@ func verifyQuote(quote any, options *Options) error {
 	if collateral != nil {
 		logger.V(1).Info("Verifying TD Quote Body using TCB Info API response")
 		var err error
-		quoteBodyOptions := tdQuoteBodyOptions{tcbInfo: collateral.TdxTcbInfo.TcbInfo, pckCertExtensions: pckCertExtensions}
+		quoteBodyOptions := tdQuoteBodyOptions{tcbInfo: collateral.TdxTcbInfo.TcbInfo, pckCertExtensions: pckCertExtensions, acceptedTCBStatuses: options.AcceptedTCBStatuses}
 		switch q := quote.(type) {
 		case *pb.QuoteV4:
 			err = verifyTdQuoteBody(q.GetTdQuoteBody(), &quoteBodyOptions)
@@ -1258,7 +1267,8 @@ func verifyQuote(quote any, options *Options) error {
 		logger.V(1).Info("Verifying QE Report using QE Identity API response")
 		if err := verifyQeReport(qeReportCertificationData.GetQeReport(),
 			&qeReportOptions{
-				qeIdentity: &collateral.QeIdentity.EnclaveIdentity,
+				qeIdentity:          &collateral.QeIdentity.EnclaveIdentity,
+				acceptedTCBStatuses: options.AcceptedTCBStatuses,
 			}); err != nil {
 			return err
 		}
@@ -1605,10 +1615,16 @@ func RootOfTrustToOptions(rot *ccpb.RootOfTrust) (*Options, error) {
 		return nil, err
 	}
 
+	var accepted []pcs.TcbComponentStatus
+	for _, s := range rot.AcceptedTcbStatuses {
+		accepted = append(accepted, pcs.TcbComponentStatus(s))
+	}
+
 	return &Options{
-		CheckRevocations: rot.CheckCrl,
-		GetCollateral:    rot.GetCollateral,
-		TrustedRoots:     trustedRoots,
+		CheckRevocations:    rot.CheckCrl,
+		GetCollateral:       rot.GetCollateral,
+		TrustedRoots:        trustedRoots,
+		AcceptedTCBStatuses: accepted,
 	}, nil
 }
 

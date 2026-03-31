@@ -116,6 +116,8 @@ var (
 	maxRetryDelay   = flag.Duration("max_retry_delay", defaultMaxRetryDelay, "Maximum Duration to wait between HTTP request retries.")
 	testLocalGetter = flag.Bool("test_local_getter", false, "Use this flag only to test this CLI tool when network access is not available")
 
+	acceptedTcbStatuses = flag.String("accepted_tcb_statuses", "", "Comma-separated list of acceptable TCB statuses (e.g. UpToDate,SWHardeningNeeded,ConfigurationNeeded). If empty, only UpToDate is accepted.")
+
 	// Assign the values of the flags to the corresponding proto fields
 	config = &ccpb.Config{
 		RootOfTrust: &ccpb.RootOfTrust{},
@@ -332,6 +334,13 @@ func populateRootOfTrust() error {
 	}
 	if len(paths) > 0 {
 		rot.CabundlePaths = paths
+	}
+	if *acceptedTcbStatuses != "" {
+		statuses := strings.Split(*acceptedTcbStatuses, ",")
+		for i := range statuses {
+			statuses[i] = strings.TrimSpace(statuses[i])
+		}
+		rot.AcceptedTcbStatuses = statuses
 	}
 	return nil
 }
