@@ -39,12 +39,12 @@ const (
 	tdxAttributesSeptVeDisSupport = 1 << 28
 	tdxAttributesPksSupport       = 1 << 30
 	tdxAttributesPerfmonSupport   = 1 << 63
-	// Supported ATTRIBUTES bits depend on the supported features - bits 0 (DEBUG), 30 (PKS), 63 (PERFMON)
-	// and 28 (SEPT VE DISABLE)
+	// Supported ATTRIBUTES bits depend on the supported features - bits 0 (DEBUG), 28 (SEPT VE DISABLE), 29 (MIGRATABLE), 30 (PKS) and 63 (PERFMON).
 	// If bit X is 0 in tdAttributesFixed0, it must be 0 in any tdAttributes.
-	tdAttributesFixed0   = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport
-	tdAttributesDebugBit = 0x1
-	rtmrsCount           = 4
+	tdAttributesFixed0        = 0x1 | tdxAttributesSeptVeDisSupport | tdxAttributesPksSupport | tdxAttributesPerfmonSupport | tdAttributesMigratableBit
+	tdAttributesDebugBit      = 0x1
+	tdAttributesMigratableBit = 1 << 29
+	rtmrsCount                = 4
 )
 
 // Options represents validation options for a TDX attestation Quote.
@@ -92,6 +92,9 @@ type TdQuoteBodyOptions struct {
 	EnableTdDebugCheck bool
 	MinimumTeeTcbSvn2  []byte
 	MrServiceTd        []byte
+	// EnableTdMigratableCheck determines whether the MIGRATABLE bit (bit 29) in TD_ATTRIBUTES is checked.
+	// If true, the MIGRATABLE bit must be 0. If false, the MIGRATABLE bit is not checked.
+	EnableTdMigratableCheck bool
 }
 
 func lengthCheck(name string, length int, value []byte) error {
@@ -163,20 +166,21 @@ func PolicyToOptions(policy *ccpb.Policy) (*Options, error) {
 			QeVendorID:    policy.GetHeaderPolicy().GetQeVendorId(),
 		},
 		TdQuoteBodyOptions: TdQuoteBodyOptions{
-			MinimumTeeTcbSvn:   policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
-			MrSeam:             policy.GetTdQuoteBodyPolicy().GetMrSeam(),
-			TdAttributes:       policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
-			Xfam:               policy.GetTdQuoteBodyPolicy().GetXfam(),
-			MrTd:               policy.GetTdQuoteBodyPolicy().GetMrTd(),
-			MrConfigID:         policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
-			MrOwner:            policy.GetTdQuoteBodyPolicy().GetMrOwner(),
-			MrOwnerConfig:      policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
-			Rtmrs:              policy.GetTdQuoteBodyPolicy().GetRtmrs(),
-			ReportData:         policy.GetTdQuoteBodyPolicy().GetReportData(),
-			AnyMrTd:            policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
-			EnableTdDebugCheck: policy.GetTdQuoteBodyPolicy().GetEnableTdDebugCheck(),
-			MinimumTeeTcbSvn2:  policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn2(),
-			MrServiceTd:        policy.GetTdQuoteBodyPolicy().GetMrServiceTd(),
+			MinimumTeeTcbSvn:        policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn(),
+			MrSeam:                  policy.GetTdQuoteBodyPolicy().GetMrSeam(),
+			TdAttributes:            policy.GetTdQuoteBodyPolicy().GetTdAttributes(),
+			Xfam:                    policy.GetTdQuoteBodyPolicy().GetXfam(),
+			MrTd:                    policy.GetTdQuoteBodyPolicy().GetMrTd(),
+			MrConfigID:              policy.GetTdQuoteBodyPolicy().GetMrConfigId(),
+			MrOwner:                 policy.GetTdQuoteBodyPolicy().GetMrOwner(),
+			MrOwnerConfig:           policy.GetTdQuoteBodyPolicy().GetMrOwnerConfig(),
+			Rtmrs:                   policy.GetTdQuoteBodyPolicy().GetRtmrs(),
+			ReportData:              policy.GetTdQuoteBodyPolicy().GetReportData(),
+			AnyMrTd:                 policy.GetTdQuoteBodyPolicy().GetAnyMrTd(),
+			EnableTdDebugCheck:      policy.GetTdQuoteBodyPolicy().GetEnableTdDebugCheck(),
+			MinimumTeeTcbSvn2:       policy.GetTdQuoteBodyPolicy().GetMinimumTeeTcbSvn2(),
+			MrServiceTd:             policy.GetTdQuoteBodyPolicy().GetMrServiceTd(),
+			EnableTdMigratableCheck: policy.GetTdQuoteBodyPolicy().GetEnableTdMigratableCheck(),
 		},
 	}
 
@@ -403,7 +407,7 @@ func validateXfam(value []byte, fixed1, fixed0 uint64) error {
 	return nil
 }
 
-func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugCheck bool) error {
+func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugCheck bool, enableTdMigratableCheck bool) error {
 	if len(value) == 0 {
 		return nil
 	}
@@ -415,6 +419,12 @@ func validateTdAttributes(value []byte, fixed1, fixed0 uint64, enableTdDebugChec
 	if enableTdDebugCheck {
 		if (tdAttributes & tdAttributesDebugBit) != 0 {
 			return fmt.Errorf("TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed")
+		}
+	}
+
+	if enableTdMigratableCheck {
+		if (tdAttributes & tdAttributesMigratableBit) != 0 {
+			return fmt.Errorf("TD_ATTRIBUTES MIGRATABLE bit is set, but live migration is not allowed")
 		}
 	}
 
@@ -457,7 +467,7 @@ func TdxQuote(quote any, options *Options) error {
 		exactByteMatch(quote, options),
 		minVersionCheck(quote, options),
 		validateXfam(xfam, xfamFixed1, xfamFixed0),
-		validateTdAttributes(tdAttributes, tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck),
+		validateTdAttributes(tdAttributes, tdAttributesFixed1, tdAttributesFixed0, options.TdQuoteBodyOptions.EnableTdDebugCheck, options.TdQuoteBodyOptions.EnableTdMigratableCheck),
 	)
 }
 

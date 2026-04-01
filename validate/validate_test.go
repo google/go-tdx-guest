@@ -386,6 +386,9 @@ func TestTdxQuote(t *testing.T) {
 	quote12345WithDebug := quoteFn(nonce12345)
 	quote12345WithDebug.(*pb.QuoteV4).TdQuoteBody.TdAttributes[0] |= 1
 
+	quote12345WithMigratable := quoteFn(nonce12345)
+	quote12345WithMigratable.(*pb.QuoteV4).TdQuoteBody.TdAttributes[3] |= 0x20
+
 	type testCase struct {
 		name    string
 		quote   any
@@ -569,6 +572,14 @@ func TestTdxQuote(t *testing.T) {
 				TdQuoteBodyOptions: TdQuoteBodyOptions{EnableTdDebugCheck: true},
 			},
 			wantErr: "TD_ATTRIBUTES DEBUG bit is set, but debug is not allowed",
+		},
+		{
+			name:  "Test disallowed TD_ATTRIBUTES MIGRATABLE bit set",
+			quote: quote12345WithMigratable,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{EnableTdMigratableCheck: true},
+			},
+			wantErr: "TD_ATTRIBUTES MIGRATABLE bit is set, but live migration is not allowed",
 		},
 	}
 
