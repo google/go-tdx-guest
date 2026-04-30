@@ -18,6 +18,7 @@
 package rtmr
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/go-eventlog/ccel"
@@ -89,8 +90,13 @@ func TdxDefaultOpts(tdxNonce []byte) ParseTdxCcelOpts {
 // It returns an error on failing to replay the events against the RTMR bank or
 // on failing to parse malformed events.
 func ParseCcelWithTdQuote(ccelBytes []byte, tableBytes []byte, tdxAttestationQuote any, opts *ParseTdxCcelOpts) (*state.FirmwareLogState, error) {
+	return ParseCcelWithTdQuoteContext(context.TODO(), ccelBytes, tableBytes, tdxAttestationQuote, opts)
+}
+
+// ParseCcelWithTdQuoteContext behaves like ParseCcelWithTdQuote but passes the context.
+func ParseCcelWithTdQuoteContext(ctx context.Context, ccelBytes []byte, tableBytes []byte, tdxAttestationQuote any, opts *ParseTdxCcelOpts) (*state.FirmwareLogState, error) {
 	// Check that the quote contains valid signature and certificates.
-	if err := verify.TdxQuote(tdxAttestationQuote, opts.Verification); err != nil {
+	if err := verify.TdxQuoteContext(ctx, tdxAttestationQuote, opts.Verification); err != nil {
 		return nil, err
 	}
 	// Check that the fields of the quote are acceptable.
