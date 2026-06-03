@@ -367,7 +367,11 @@ func quoteToProtoV5(b []uint8) (*pb.QuoteV5, error) {
 	offset += signedDataSizeFieldLengthV5
 
 	additionalData := data[offset:]
-	if int32(len(additionalData)) < signedDataSizeV5 {
+	// signedDataSizeV5 is read as a uint32 but held in an int32; reject a negative
+	// (high-bit-set) value before it is used as a slice bound below. Otherwise the
+	// `int32(len(additionalData)) < signedDataSizeV5` comparison is bypassed for a
+	// negative size and `data[offset : offset+signedDataSizeV5]` slices out of bounds.
+	if signedDataSizeV5 < 0 || int64(len(additionalData)) < int64(signedDataSizeV5) {
 		return nil, fmt.Errorf("size of signed data is 0x%x. Expected minimum size of 0x%x", len(additionalData), signedDataSizeV5)
 	}
 
