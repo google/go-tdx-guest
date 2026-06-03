@@ -616,8 +616,18 @@ func qeAuthDataToProto(b []uint8) (*pb.QeAuthData, uint32, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
 	authData := &pb.QeAuthData{}
 
+	if len(data) < authDataParsedDataSizeEnd {
+		return nil, 0, fmt.Errorf("QE AuthData buffer too short: got %d bytes, need at least %d", len(data), authDataParsedDataSizeEnd)
+	}
 	authData.ParsedDataSize = uint32(binary.LittleEndian.Uint16(data[authDataParsedDataSizeStart:authDataParsedDataSizeEnd]))
 	authDataEnd := authDataParsedDataSizeEnd + authData.GetParsedDataSize()
+	// Bound-check the attacker-controlled ParsedDataSize before slicing, mirroring the
+	// pre-slice length checks in certificationDataToProto/signedDataToProto. Without this,
+	// a ParsedDataSize larger than the remaining buffer panics the parser (out-of-bounds
+	// slice) instead of returning an error.
+	if uint64(authDataParsedDataSizeEnd)+uint64(authData.GetParsedDataSize()) > uint64(len(data)) {
+		return nil, 0, fmt.Errorf("QE AuthData parsed data size %d overflows the %d-byte buffer", authData.GetParsedDataSize(), len(data))
+	}
 	authData.Data = data[authDataStart:authDataEnd]
 	if err := checkQeAuthData(authData); err != nil {
 		return nil, 0, fmt.Errorf("parsing QE AuthData failed: %v", err)
