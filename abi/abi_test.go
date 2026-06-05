@@ -86,6 +86,123 @@ func TestQuoteToProto(t *testing.T) {
 			}(),
 			wantErr: "TD quote body size is 648, a V5 TDX1.0 quote should have size 584",
 		},
+		{
+			name:     "quote too small to determine format",
+			rawQuote: []byte{1},
+			wantErr:  "unable to determine quote format since bytes length is less than 2 bytes",
+		},
+		{
+			name:     "v4 quote too small",
+			rawQuote: test.RawQuote[:100],
+			wantErr:  "raw quote size is 0x64, a TDX quote should have size a minimum size of 0x3fc",
+		},
+		{
+			name: "v4 quote signed data size too large",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// SignedDataSize is at 0x278 (632)
+				binary.LittleEndian.PutUint32(q[0x278:0x27C], 0xffffffff)
+				return q
+			}(),
+			wantErr: "size of signed data is 0x10f2. Expected minimum size of 0xffffffff",
+		},
+		{
+			name: "v5 quote signed data size too large",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuoteV5)
+				// In test.RawQuoteV5, it is TDX1.5, so body size is 648.
+				// Header (48) + Descriptor (654) = 702.
+				// SignedDataSize is at 702.
+				binary.LittleEndian.PutUint32(q[702:706], 0x7fffffff)
+				return q
+			}(),
+			wantErr: "size of signed data is 0x10cc. Expected minimum size of 0x7fffffff",
+		},
+		{
+			name: "v5 quote signed data size negative",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuoteV5)
+				// SignedDataSize is at 702.
+				binary.LittleEndian.PutUint32(q[702:706], 0xffffffff) // -1 as int32
+				return q
+			}(),
+			wantErr: "signed data size -1 is negative",
+		},
+		{
+			name: "v4 quote invalid TEE type in header",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// TeeType is at 4 to 8 in header
+				binary.LittleEndian.PutUint32(q[4:8], 0)
+				return q
+			}(),
+			wantErr: "parsing header failed: TEE type is not TDX",
+		},
+		{
+			name: "v4 quote signed data size too small for auth data",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// SignedDataSize is at 0x278 (632)
+				binary.LittleEndian.PutUint32(q[0x278:0x27C], 100)
+				return q
+			}(),
+			wantErr: "signed data size is 100 bytes. Expected at least 128 bytes",
+		},
+		{
+			name: "v4 quote signed data size too small for cert data",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// SignedDataSize is at 0x278 (632)
+				binary.LittleEndian.PutUint32(q[0x278:0x27C], 130)
+				return q
+			}(),
+			wantErr: "certification data size is 2 bytes. Expected at least 6 bytes",
+		},
+		{
+			name: "v4 quote invalid certification data type",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// Certification data starts at 636 + 128 = 764.
+				// CertificateDataType is at 764:766. Set to 5.
+				binary.LittleEndian.PutUint16(q[764:766], 5)
+				return q
+			}(),
+			wantErr: "parsing certification data failed: certification data type invalid, got 5, expected 6",
+		},
+		{
+			name: "v4 quote rawCertificateData too small for QE report",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// SignedDataSize is at 0x278 (632). Set to 128 + 6 + 400 = 534.
+				binary.LittleEndian.PutUint32(q[0x278:0x27C], 534)
+				// Size field in cert data is at 766:770. Set to 400.
+				binary.LittleEndian.PutUint32(q[766:770], 400)
+				return q
+			}(),
+			wantErr: "QE report certification data size is 400 bytes. Expected at least 448 bytes",
+		},
+		{
+			name: "v4 quote QE auth data too small",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// SignedDataSize is at 0x278 (632). Set to 128 + 6 + 449 = 583.
+				binary.LittleEndian.PutUint32(q[0x278:0x27C], 583)
+				// Size field in cert data is at 766:770. Set to 449.
+				binary.LittleEndian.PutUint32(q[766:770], 449)
+				return q
+			}(),
+			wantErr: "QE auth data size is 1 bytes. Expected at least 2 bytes",
+		},
+		{
+			name: "v4 quote QE auth data parsed size mismatch",
+			rawQuote: func() []byte {
+				q := clone(test.RawQuote)
+				// Modify ParsedDataSize at 1218:1220 to 4000.
+				binary.LittleEndian.PutUint16(q[1218:1220], 4000)
+				return q
+			}(),
+			wantErr: "QE auth data size is 3717 bytes. Expected 4002 bytes",
+		},
 	}
 
 	for _, tc := range tcs {

@@ -317,7 +317,7 @@ func quoteToProtoV4(b []uint8) (*pb.QuoteV4, error) {
 	quote.SignedDataSize = binary.LittleEndian.Uint32(data[quoteSignedDataSizeStart:quoteSignedDataSizeEnd])
 
 	additionalData := data[quoteSignedDataStart:]
-	if uint32(len(additionalData)) < quote.GetSignedDataSize() {
+	if uint64(len(additionalData)) < uint64(quote.GetSignedDataSize()) {
 		return nil, fmt.Errorf("size of signed data is 0x%x. Expected minimum size of 0x%x", len(additionalData), quote.GetSignedDataSize())
 	}
 	quoteSignedDataEnd := quoteSignedDataStart + quote.GetSignedDataSize()
@@ -367,7 +367,10 @@ func quoteToProtoV5(b []uint8) (*pb.QuoteV5, error) {
 	offset += signedDataSizeFieldLengthV5
 
 	additionalData := data[offset:]
-	if int32(len(additionalData)) < signedDataSizeV5 {
+	if signedDataSizeV5 < 0 {
+		return nil, fmt.Errorf("signed data size %d is negative", signedDataSizeV5)
+	}
+	if int64(len(additionalData)) < int64(signedDataSizeV5) {
 		return nil, fmt.Errorf("size of signed data is 0x%x. Expected minimum size of 0x%x", len(additionalData), signedDataSizeV5)
 	}
 
@@ -395,6 +398,9 @@ func quoteToProtoV5(b []uint8) (*pb.QuoteV5, error) {
 
 func headerToProto(b []uint8) (*pb.Header, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) != headerSize {
+		return nil, fmt.Errorf("header size is %d bytes. Expected %d bytes", len(data), headerSize)
+	}
 	header := &pb.Header{}
 
 	quoteVersion := uint32(binary.LittleEndian.Uint16(data[headerVersionStart:headerVersionEnd]))
@@ -417,6 +423,9 @@ func headerToProto(b []uint8) (*pb.Header, error) {
 
 func tdQuoteBodyToProto(b []uint8) (*pb.TDQuoteBody, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) != tdQuoteBodySize {
+		return nil, fmt.Errorf("td quote body size is %d bytes. Expected %d bytes", len(data), tdQuoteBodySize)
+	}
 	report := &pb.TDQuoteBody{}
 	report.TeeTcbSvn = data[tdTeeTcbSvnStart:tdTeeTcbSvnEnd]
 	report.MrSeam = data[tdMrSeamStart:tdMrSeamEnd]
@@ -445,8 +454,10 @@ func tdQuoteBodyToProto(b []uint8) (*pb.TDQuoteBody, error) {
 }
 
 func tdQuoteBodyDescriptorToProto(b []uint8) (*pb.TDQuoteBodyDescriptor, int32, error) {
-
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < quoteBodyTypeSizeV5+quoteBodySizeFieldLengthV5 {
+		return nil, 0, fmt.Errorf("td quote body descriptor size is %d bytes. Expected at least %d bytes", len(data), quoteBodyTypeSizeV5+quoteBodySizeFieldLengthV5)
+	}
 	var offset int32
 
 	tdQuoteBodyDescriptor := &pb.TDQuoteBodyDescriptor{}
@@ -459,6 +470,12 @@ func tdQuoteBodyDescriptorToProto(b []uint8) (*pb.TDQuoteBodyDescriptor, int32, 
 	}
 	if tdQuoteBodyDescriptor.TdQuoteBodyType == tdxVersion15BodyType && tdQuoteBodyDescriptor.TdQuoteBodySize != tdQuoteBodySizeV5TDX15 {
 		return nil, 0, fmt.Errorf("TD quote body size is %d, a V5 TDX1.5 quote should have size %d", tdQuoteBodyDescriptor.TdQuoteBodySize, tdQuoteBodySizeV5TDX15)
+	}
+	if tdQuoteBodyDescriptor.TdQuoteBodyType != tdxVersion10BodyType && tdQuoteBodyDescriptor.TdQuoteBodyType != tdxVersion15BodyType {
+		return nil, 0, fmt.Errorf("parsing TD Quote Body Descriptor failed: unsupported TD quote body type , got %d", tdQuoteBodyDescriptor.TdQuoteBodyType)
+	}
+	if len(data) < quoteBodyTypeSizeV5+quoteBodySizeFieldLengthV5+int(tdQuoteBodyDescriptor.TdQuoteBodySize) {
+		return nil, 0, fmt.Errorf("td quote body descriptor size is %d bytes. Expected %d bytes", len(data), quoteBodyTypeSizeV5+quoteBodySizeFieldLengthV5+int(tdQuoteBodyDescriptor.TdQuoteBodySize))
 	}
 	offset += quoteBodySizeFieldLengthV5
 	tdQuoteBodyV5.TeeTcbSvn = data[offset : offset+teeTcbSvnSizeV5]
@@ -514,6 +531,9 @@ func tdQuoteBodyDescriptorToProto(b []uint8) (*pb.TDQuoteBodyDescriptor, int32, 
 
 func signedDataToProto(b []uint8) (*pb.Ecdsa256BitQuoteV4AuthData, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < quoteV4AuthDataKnownSize {
+		return nil, fmt.Errorf("signed data size is %d bytes. Expected at least %d bytes", len(data), quoteV4AuthDataKnownSize)
+	}
 	signedData := &pb.Ecdsa256BitQuoteV4AuthData{}
 	signedData.Signature = data[signedDataSignatureStart:signedDataSignatureEnd]
 	signedData.EcdsaAttestationKey = data[signedDataAttestationKeyStart:signedDataAttestationKeyEnd]
@@ -533,12 +553,15 @@ func signedDataToProto(b []uint8) (*pb.Ecdsa256BitQuoteV4AuthData, error) {
 
 func certificationDataToProto(b []uint8) (*pb.CertificationData, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < certificationDataKnownSize {
+		return nil, fmt.Errorf("certification data size is %d bytes. Expected at least %d bytes", len(data), certificationDataKnownSize)
+	}
 	certification := &pb.CertificationData{}
 
 	certification.CertificateDataType = uint32(binary.LittleEndian.Uint16(data[certificateDataTypeStart:certificateDataTypeEnd]))
 	certification.Size = binary.LittleEndian.Uint32(data[certificateSizeStart:certificateSizeEnd])
 	rawCertificateData := data[certificateDataStart:]
-	if uint32(len(rawCertificateData)) != certification.GetSize() {
+	if uint64(len(rawCertificateData)) != uint64(certification.GetSize()) {
 		return nil, fmt.Errorf("size of certificate data is 0x%x. Expected size 0x%x", len(rawCertificateData), certification.GetSize())
 	}
 
@@ -557,6 +580,9 @@ func certificationDataToProto(b []uint8) (*pb.CertificationData, error) {
 
 func qeReportCertificationDataToProto(b []uint8) (*pb.QEReportCertificationData, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < qeReportCertificationDataSignatureEnd {
+		return nil, fmt.Errorf("QE report certification data size is %d bytes. Expected at least %d bytes", len(data), qeReportCertificationDataSignatureEnd)
+	}
 	qeReportCertificationData := &pb.QEReportCertificationData{}
 
 	enclaveReport, err := enclaveReportToProto(data[enclaveReportStart:enclaveReportEnd])
@@ -591,6 +617,9 @@ func qeReportCertificationDataToProto(b []uint8) (*pb.QEReportCertificationData,
 
 func enclaveReportToProto(b []uint8) (*pb.EnclaveReport, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) != qeReportSize {
+		return nil, fmt.Errorf("enclave report size is %d bytes. Expected %d bytes", len(data), qeReportSize)
+	}
 	enclaveReport := &pb.EnclaveReport{}
 
 	enclaveReport.CpuSvn = data[qeCPUSvnStart:qeCPUSvnEnd]
@@ -614,10 +643,16 @@ func enclaveReportToProto(b []uint8) (*pb.EnclaveReport, error) {
 
 func qeAuthDataToProto(b []uint8) (*pb.QeAuthData, uint32, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < qeAuthDataKnownSize {
+		return nil, 0, fmt.Errorf("QE auth data size is %d bytes. Expected at least %d bytes", len(data), qeAuthDataKnownSize)
+	}
 	authData := &pb.QeAuthData{}
 
 	authData.ParsedDataSize = uint32(binary.LittleEndian.Uint16(data[authDataParsedDataSizeStart:authDataParsedDataSizeEnd]))
 	authDataEnd := authDataParsedDataSizeEnd + authData.GetParsedDataSize()
+	if uint64(len(data)) < uint64(authDataEnd) {
+		return nil, 0, fmt.Errorf("QE auth data size is %d bytes. Expected %d bytes", len(data), authDataEnd)
+	}
 	authData.Data = data[authDataStart:authDataEnd]
 	if err := checkQeAuthData(authData); err != nil {
 		return nil, 0, fmt.Errorf("parsing QE AuthData failed: %v", err)
@@ -627,6 +662,9 @@ func qeAuthDataToProto(b []uint8) (*pb.QeAuthData, uint32, error) {
 
 func pckCertificateChainToProto(b []uint8) (*pb.PCKCertificateChainData, error) {
 	data := clone(b) // Created an independent copy to make the interface less error-prone
+	if len(data) < pckCertificateChainKnownSize {
+		return nil, fmt.Errorf("PCK certificate chain size is %d bytes. Expected at least %d bytes", len(data), pckCertificateChainKnownSize)
+	}
 	pckCertificateChain := &pb.PCKCertificateChainData{}
 
 	pckCertificateChain.CertificateDataType = uint32(binary.LittleEndian.Uint16(data[pckCertChainCertificationDataTypeStart:pckCertChainCertificationDataTypeEnd]))
@@ -782,7 +820,7 @@ func checkPCKCertificateChain(chain *pb.PCKCertificateChainData) error {
 	if chain.GetCertificateDataType() != pckReportCertificationDataType {
 		return fmt.Errorf("PCK certificate chain data type invalid, got %d, expected %d", chain.GetCertificateDataType(), pckReportCertificationDataType)
 	}
-	if chain.GetSize() != uint32(len(chain.GetPckCertChain())) {
+	if uint64(chain.GetSize()) != uint64(len(chain.GetPckCertChain())) {
 		return fmt.Errorf("PCK certificate chain size is %d. Expected size %d", len(chain.GetPckCertChain()), chain.GetSize())
 	}
 	return nil
