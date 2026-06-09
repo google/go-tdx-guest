@@ -158,6 +158,8 @@ func run(baseURL string) error {
 		return err
 	}
 
+	fmt.Fprintf(os.Stderr, "Fetching provenance for PPID: %s\n", ppid)
+
 	bodyBytes, err := fetchProvenanceData(baseURL, ppid, *bucketNameFlag)
 	if err != nil {
 		return err
