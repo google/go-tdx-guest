@@ -18,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
 
@@ -609,5 +610,37 @@ func TestPanicMinimumTeeTcbSvn(t *testing.T) {
 	err = TdxQuote(quote, opts)
 	if err == nil {
 		t.Fatalf("Expected error for invalid MinimumTeeTcbSvn length, got nil")
+	}
+}
+
+func TestAnyMrTdValidationBypass(t *testing.T) {
+	policy := &ccpb.Policy{
+		TdQuoteBodyPolicy: &ccpb.TDQuoteBodyPolicy{
+			AnyMrTd: [][]byte{{}},
+		},
+	}
+	opts, err := PolicyToOptions(policy)
+	if err != nil {
+		t.Fatalf("PolicyToOptions failed: %v", err)
+	}
+
+	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	if err != nil {
+		t.Fatalf("QuoteToProto failed: %v", err)
+	}
+	q, ok := quote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatalf("Expected QuoteV4, got %T", quote)
+	}
+
+	// Populate quote with an adversary-crafted MrTd
+	adversaryMrTd := make([]byte, abi.MrTdSize)
+	for i := range adversaryMrTd {
+		adversaryMrTd[i] = 0x99
+	}
+	q.TdQuoteBody.MrTd = adversaryMrTd
+
+	if err := TdxQuote(quote, opts); err == nil {
+		t.Fatalf("Expected error when validating adversary MrTd with empty AnyMrTd slice, got nil")
 	}
 }

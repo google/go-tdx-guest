@@ -215,6 +215,9 @@ func byteCheckAny(size int, given []byte, allowed [][]byte) error {
 		return nil
 	}
 	for i, bs := range allowed {
+		if len(bs) == 0 {
+			continue
+		}
 		if err := byteCheck("MrTd", fmt.Sprintf("AnyMrTd[%d]", i), size, given, bs); err == nil {
 			return nil
 		}
