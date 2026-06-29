@@ -590,3 +590,24 @@ func TestTdxQuote(t *testing.T) {
 		}
 	}
 }
+
+func TestPanicMinimumTeeTcbSvn(t *testing.T) {
+	opts := &Options{
+		TdQuoteBodyOptions: TdQuoteBodyOptions{
+			MinimumTeeTcbSvn: []byte{1},
+		},
+	}
+	quote, err := abi.QuoteToProto(testdata.RawQuote)
+	if err != nil {
+		t.Fatalf("QuoteToProto failed: %v", err)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Unexpected panic occurred: %v", r)
+		}
+	}()
+	err = TdxQuote(quote, opts)
+	if err == nil {
+		t.Fatalf("Expected error for invalid MinimumTeeTcbSvn length, got nil")
+	}
+}
