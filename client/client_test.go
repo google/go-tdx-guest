@@ -158,8 +158,8 @@ func TestGetQuoteViaProvider(t *testing.T) {
 
 type faultyQuoteDevice struct{}
 
-func (d *faultyQuoteDevice) Open(path string) error { return nil }
-func (d *faultyQuoteDevice) Close() error           { return nil }
+func (d *faultyQuoteDevice) Open(_ string) error { return nil }
+func (d *faultyQuoteDevice) Close() error        { return nil }
 func (d *faultyQuoteDevice) Ioctl(command uintptr, argument any) (uintptr, error) {
 	switch command {
 	case labi.IocTdxGetReport:
