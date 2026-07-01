@@ -34,6 +34,8 @@ jobs:
           - ubuntu-latest
     name: 'Build/Test (${{ matrix.os}}, Go ${{ matrix.go-version }})'
     runs-on: '${{ matrix.os }}'
+    env:
+      CGO_ENABLED: 0
     steps:
       - uses: actions/checkout@v3
       - name: Setup Go
@@ -53,19 +55,9 @@ jobs:
       - name: Generate all protobufs
         run: go generate ./...
       - name: Build all packages
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            go build -v -ldflags="-linkmode=external" ./...
-          else
-            go build -v ./...
-          fi
+        run: go build -v ./...
       - name: Test all packages
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            go test -v -ldflags="-linkmode=external" ./...
-          else
-            go test -v ./...
-          fi
+        run: go test -v ./...
 
   lint:
     strategy:
