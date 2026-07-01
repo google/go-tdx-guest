@@ -875,7 +875,7 @@ func TestNegativeTcbInfoTcbStatusV4(t *testing.T) {
 	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 0
 	tcbInfo.TcbLevels[0].TcbStatus = "OutOfDate"
 	if gotErr, wantErr := checkTcbInfoTcbStatus(tcbInfo, quote.GetTdQuoteBody(), ext), ErrTdxTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
-		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", err, wantErr)
+		t.Errorf("TCB status expired: checkTcbInfoTcbStatus() = %v. Want error %v", gotErr, wantErr)
 	}
 }
 
@@ -901,13 +901,13 @@ func TestNegativeCheckQeStatusV4(t *testing.T) {
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 10
 	wantErr := "no matching QE TCB level found"
 	if err := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()); err == nil || err.Error() != wantErr {
-		t.Errorf("No matching TCB level: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
+		t.Errorf("No matching TCB level: checkQeTcbStatus() = %v. Want error %v", err, wantErr)
 	}
 
 	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 0
 	qeIdentity.TcbLevels[0].TcbStatus = "OutOfDate"
 	if gotErr, wantErr := checkQeTcbStatus(qeIdentity.TcbLevels, qeReport.GetIsvSvn()), ErrEnclaveTcbStatus; gotErr == nil || !errors.Is(gotErr, wantErr) {
-		t.Errorf("TCB status expired: verifyUsingQeIdentity() = %v. Want error %v", err, wantErr)
+		t.Errorf("TCB status expired: checkQeTcbStatus() = %v. Want error %v", gotErr, wantErr)
 	}
 }
 
@@ -945,7 +945,7 @@ func TestValidateCRL(t *testing.T) {
 
 func TestNegativeRawQuoteVerifyWithCollateral(t *testing.T) {
 	getter := testcases.TestGetter
-	options := &Options{CheckRevocations: true, GetCollateral: true, Getter: getter, Now: testTimeSet(currentTime)}
+	options := &Options{CheckRevocations: true, GetCollateral: true, Getter: getter, Now: testTimeSet(currentTime), DisableTcbStatusCheck: false}
 	wantErr := "TDX TCB info reported by Intel PCS failed TCB status check: no matching TCB level found"
 	// Due to updated SVN values in the sample response, it will result in TCB status failure,
 	// when compared to the TD Quote Body's TeeTcbSvn value.
@@ -1230,4 +1230,79 @@ var rawTdxQuoteFuncs = map[string]func([]byte, *Options) error{
 	"RawTdxQuoteContext": func(quote []byte, options *Options) error {
 		return RawTdxQuoteContext(context.Background(), quote, options)
 	},
+}
+
+func TestDisableTcbStatusCheckOption(t *testing.T) {
+	getter := testcases.TestGetter
+
+	fmspcBytes := []byte{80, 128, 111, 0, 0, 0}
+	fmspc := hex.EncodeToString(fmspcBytes)
+
+	collateral := &Collateral{}
+	if err := getTcbInfo(context.Background(), fmspc, getter, collateral); err != nil {
+		t.Fatal(err)
+	}
+	if err := getQeIdentity(context.Background(), getter, collateral); err != nil {
+		t.Fatal(err)
+	}
+	anyQuote, err := abi.QuoteToProto(testdata.RawQuote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote, ok := anyQuote.(*pb.QuoteV4)
+	if !ok {
+		t.Fatal("quote is not a QuoteV4")
+	}
+	chain, err := ExtractChainFromQuote(quote)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext, err := pcs.PckCertificateExtensions(chain.PCKCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcbInfo := &collateral.TdxTcbInfo.TcbInfo
+	qeIdentity := &collateral.QeIdentity.EnclaveIdentity
+
+	// Align SVNs and fields so that both TCB Info and QE Identity matching succeeds
+	setTcbSvnValues(0, 0, &tcbInfo.TcbLevels[0].Tcb.TdxTcbcomponents, &tcbInfo.TcbLevels[0].Tcb.SgxTcbcomponents)
+	tcbInfo.TcbLevels[0].Tcb.Pcesvn = 0
+	qeIdentity.TcbLevels[0].Tcb.Isvsvn = 0
+
+	// Set MrSigner and SeamAttributes in collateral to match the quote
+	tcbInfo.TdxModule.Mrsigner.Bytes = quote.GetTdQuoteBody().GetMrSignerSeam()
+	seamAttributes := quote.GetTdQuoteBody().GetSeamAttributes()
+	tcbInfo.TdxModule.AttributesMask.Bytes = make([]byte, len(seamAttributes))
+	tcbInfo.TdxModule.Attributes.Bytes = make([]byte, len(seamAttributes))
+	for i := range seamAttributes {
+		tcbInfo.TdxModule.AttributesMask.Bytes[i] = 0xff
+		tcbInfo.TdxModule.Attributes.Bytes[i] = seamAttributes[i]
+	}
+
+	tcbInfo.TcbLevels[0].TcbStatus = "OutOfDate"
+
+	optsFalse := Options{
+		GetCollateral:         true,
+		Now:                   defaultTimeSet(),
+		chain:                 chain,
+		collateral:            collateral,
+		pckCertExtensions:     ext,
+		DisableTcbStatusCheck: true,
+	}
+	if err := verifyQuote(quote, &optsFalse); err != nil {
+		t.Errorf("verifyQuote() with DisableTcbStatusCheck=true got error %v, want nil", err)
+	}
+
+	optsTrue := Options{
+		GetCollateral:         true,
+		Now:                   defaultTimeSet(),
+		chain:                 chain,
+		collateral:            collateral,
+		pckCertExtensions:     ext,
+		DisableTcbStatusCheck: false,
+	}
+	if err := verifyQuote(quote, &optsTrue); err == nil || !strings.Contains(err.Error(), ErrTdxTcbStatus.Error()) {
+		t.Errorf("verifyQuote() with DisableTcbStatusCheck=false got %v, want error containing %v", err, ErrTdxTcbStatus)
+	}
 }

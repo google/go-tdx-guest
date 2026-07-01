@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"testing"
 
@@ -51,7 +52,13 @@ type testCase struct {
 var check string
 
 func TestMain(m *testing.M) {
-	if output, err := exec.Command("go", "build", "-buildvcs=false", ".").CombinedOutput(); err != nil {
+	args := []string{"build", "-buildvcs=false"}
+	if runtime.GOOS == "darwin" {
+		args = append(args, "-ldflags=-linkmode=external")
+	}
+	args = append(args, ".")
+
+	if output, err := exec.Command("go", args...).CombinedOutput(); err != nil {
 		die(fmt.Errorf("could not build check tool: %v, %s", err, output))
 	}
 	check = "./check"

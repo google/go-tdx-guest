@@ -110,11 +110,12 @@ var (
 	minpcesvn = flag.String("minimum_pce_svn", "", "The minimum acceptable value for PCE_SVN field.")
 
 	// Optional Bool
-	checkcrl        = flag.String("check_crl", "", "Download and check the CRL for revoked certificates. -get_collateral must be true.")
-	getcollateral   = flag.String("get_collateral", "", "If true, then permitted to download necessary collaterals for additional checks.")
-	timeout         = flag.Duration("timeout", defaultTimeout, "Duration to continue to retry failed HTTP requests.")
-	maxRetryDelay   = flag.Duration("max_retry_delay", defaultMaxRetryDelay, "Maximum Duration to wait between HTTP request retries.")
-	testLocalGetter = flag.Bool("test_local_getter", false, "Use this flag only to test this CLI tool when network access is not available")
+	checkcrl              = flag.String("check_crl", "", "Download and check the CRL for revoked certificates. -get_collateral must be true.")
+	getcollateral         = flag.String("get_collateral", "", "If true, then permitted to download necessary collaterals for additional checks.")
+	timeout               = flag.Duration("timeout", defaultTimeout, "Duration to continue to retry failed HTTP requests.")
+	maxRetryDelay         = flag.Duration("max_retry_delay", defaultMaxRetryDelay, "Maximum Duration to wait between HTTP request retries.")
+	disableTcbStatusCheck = flag.Bool("disable_tcb_status_check", false, "If true, the check will NOT verify TCB status.")
+	testLocalGetter       = flag.Bool("test_local_getter", false, "Use this flag only to test this CLI tool when network access is not available")
 
 	// Assign the values of the flags to the corresponding proto fields
 	config = &ccpb.Config{
@@ -434,6 +435,7 @@ func main() {
 	if err != nil {
 		die(err)
 	}
+	sopts.DisableTcbStatusCheck = *disableTcbStatusCheck
 	logger.V(1).Info("Input parameters parsed successfully")
 
 	var getter trust.HTTPSGetter
