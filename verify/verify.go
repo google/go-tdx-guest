@@ -891,7 +891,7 @@ func verifyPCKCertificationChain(options *Options) error {
 
 func x509Options(trustedRoots *x509.CertPool, intermediateCert *x509.Certificate, now time.Time) x509.VerifyOptions {
 	if trustedRoots == nil {
-		logger.Warning("Using embedded Intel certificate for TDX attestation root of trust")
+		logger.V(1).Info("Using embedded Intel certificate for TDX attestation root of trust")
 		trustedRoots = x509.NewCertPool()
 		trustedRoots.AddCert(trustedRootCertificate)
 	}
