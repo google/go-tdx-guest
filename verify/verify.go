@@ -32,10 +32,10 @@ import (
 	"math/big"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/pcs"
 	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
@@ -599,10 +599,10 @@ func verifyCollateral(options *Options) error {
 	if collateral.EnclaveIdentityBody == nil {
 		return ErrMissingEnclaveIdentityBody
 	}
-	if cmp.Equal(collateral.TdxTcbInfo, pcs.TdxTcbInfo{}) {
+	if reflect.DeepEqual(collateral.TdxTcbInfo, pcs.TdxTcbInfo{}) {
 		return ErrTcbInfoNil
 	}
-	if cmp.Equal(collateral.QeIdentity, pcs.QeIdentity{}) {
+	if reflect.DeepEqual(collateral.QeIdentity, pcs.QeIdentity{}) {
 		return ErrQeIdentityNil
 	}
 
@@ -1114,7 +1114,7 @@ func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensio
 		return ErrTdxTcbStatus
 	}
 	var tdxModuleTcbStatus pcs.TcbComponentStatus
-	if cmp.Equal(tdxModuleFound, pcs.TcbLevel{}) {
+	if reflect.DeepEqual(tdxModuleFound, pcs.TcbLevel{}) {
 		tdxModuleTcbStatus = pcs.TcbComponentStatusUpToDate
 	} else {
 		// when teeTcbSvn[1] > 0, tdxModuleFound is the matching TDX Module TCB Level.

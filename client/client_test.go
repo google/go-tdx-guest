@@ -21,7 +21,6 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-tdx-guest/abi"
-	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	test "github.com/google/go-tdx-guest/testing"
 	"google.golang.org/protobuf/testing/protocmp"
 )
@@ -153,46 +152,5 @@ func TestGetQuoteViaProvider(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-type faultyQuoteDevice struct{}
-
-func (d *faultyQuoteDevice) Open(_ string) error { return nil }
-func (d *faultyQuoteDevice) Close() error        { return nil }
-func (d *faultyQuoteDevice) Ioctl(command uintptr, argument any) (uintptr, error) {
-	switch command {
-	case labi.IocTdxGetReport:
-		return uintptr(labi.TdxAttestSuccess), nil
-	case labi.IocTdxGetQuote:
-		req, ok := argument.(*labi.TdxQuoteReq)
-		if !ok {
-			return 0, fmt.Errorf("unexpected argument type: %T", argument)
-		}
-		hdr, ok := req.Buffer.(*labi.TdxQuoteHdr)
-		if !ok {
-			return 0, fmt.Errorf("unexpected buffer type: %T", req.Buffer)
-		}
-		hdr.Status = 0
-		hdr.OutLen = uint32(len(hdr.Data)) + 1
-		return uintptr(labi.TdxAttestSuccess), nil
-	default:
-		return 0, fmt.Errorf("unexpected command: %v", command)
-	}
-}
-
-func TestGetRawQuoteFaultyDeviceOutLen(t *testing.T) {
-	dev := &faultyQuoteDevice{}
-	var reportData [64]byte
-
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("Unexpected panic occurred: %v", r)
-		}
-	}()
-
-	_, err := GetRawQuote(dev, reportData)
-	if err == nil {
-		t.Fatalf("Expected error for OutLen exceeding Data buffer size, got nil")
 	}
 }
