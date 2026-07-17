@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-tdx-guest/abi"
+	labi "github.com/google/go-tdx-guest/client/linuxabi"
 	test "github.com/google/go-tdx-guest/testing"
 	"google.golang.org/protobuf/testing/protocmp"
 )
@@ -150,6 +151,69 @@ func TestGetQuoteViaProvider(t *testing.T) {
 				if diff := cmp.Diff(got, quote, protocmp.Transform()); diff != "" {
 					t.Errorf("Difference in quote: %s", diff)
 				}
+			}
+		})
+	}
+}
+
+type mockDevice struct {
+	ioctl func(command uintptr, argument any) (uintptr, error)
+}
+
+func (d *mockDevice) Open(_ string) error { return nil }
+func (d *mockDevice) Close() error        { return nil }
+func (d *mockDevice) Ioctl(command uintptr, argument any) (uintptr, error) {
+	return d.ioctl(command, argument)
+}
+
+func TestGetRawQuoteBadSizes(t *testing.T) {
+	var outLen uint32
+	mock := &mockDevice{
+		ioctl: func(command uintptr, argument any) (uintptr, error) {
+			switch command {
+			case labi.IocTdxGetReport:
+				return uintptr(labi.TdxAttestSuccess), nil
+			case labi.IocTdxGetQuote:
+				req, ok := argument.(*labi.TdxQuoteReq)
+				if !ok {
+					return 0, fmt.Errorf("unexpected argument type: %T", argument)
+				}
+				hdr, ok := req.Buffer.(*labi.TdxQuoteHdr)
+				if !ok {
+					return 0, fmt.Errorf("unexpected buffer type: %T", req.Buffer)
+				}
+				hdr.Status = 0
+				hdr.OutLen = outLen
+				return uintptr(labi.TdxAttestSuccess), nil
+			default:
+				return 0, fmt.Errorf("unexpected command: %v", command)
+			}
+		},
+	}
+
+	testCases := []struct {
+		name    string
+		size    uint32
+		wantErr string
+	}{
+		{
+			name:    "Zero length quote",
+			size:    0,
+			wantErr: "invalid Quote size: 0",
+		},
+		{
+			name:    "Length larger than ReqBufSize",
+			size:    labi.ReqBufSize + 1,
+			wantErr: fmt.Sprintf("invalid Quote size: %d", labi.ReqBufSize+1),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			outLen = tc.size
+			_, err := GetRawQuote(mock, [64]byte{})
+			if !test.Match(err, tc.wantErr) {
+				t.Fatalf("GetRawQuote(mock, [64]byte{}) = %v. Want err containing: %q", err, tc.wantErr)
 			}
 		})
 	}

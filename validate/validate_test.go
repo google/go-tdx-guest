@@ -207,6 +207,26 @@ func TestTdxQuoteV5(t *testing.T) {
 			},
 		},
 		{
+			name:  "Test AnyMrTd list containing nil element",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{nil},
+				},
+			},
+			wantErr: "no value in AnyMrTd matched",
+		},
+		{
+			name:  "Test AnyMrTd list containing empty element",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{[]byte{}},
+				},
+			},
+			wantErr: "no value in AnyMrTd matched",
+		},
+		{
 			name:  "Test incorrect MR_CONFIG_ID",
 			quote: quote12345,
 			opts: &Options{
@@ -289,6 +309,16 @@ func TestTdxQuoteV5(t *testing.T) {
 				},
 			},
 			wantErr: "quote field MR_SERVICE_TD",
+		},
+		{
+			name:  "Test incorrect MinimumTeeTcbSvn option length",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MinimumTeeTcbSvn: []byte{1, 2, 3},
+				},
+			},
+			wantErr: "option \"minimum_tee_tcb_svn\" length is 3. Want 16",
 		},
 	}
 
@@ -510,6 +540,26 @@ func TestTdxQuote(t *testing.T) {
 			},
 		},
 		{
+			name:  "Test AnyMrTd list containing nil element",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{nil},
+				},
+			},
+			wantErr: "no value in AnyMrTd matched",
+		},
+		{
+			name:  "Test AnyMrTd list containing empty element",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					AnyMrTd: [][]byte{[]byte{}},
+				},
+			},
+			wantErr: "no value in AnyMrTd matched",
+		},
+		{
 			name:  "Test incorrect MR_CONFIG_ID",
 			quote: quote12345,
 			opts: &Options{
@@ -580,6 +630,16 @@ func TestTdxQuote(t *testing.T) {
 				TdQuoteBodyOptions: TdQuoteBodyOptions{EnableTdMigratableCheck: true},
 			},
 			wantErr: "TD_ATTRIBUTES MIGRATABLE bit is set, but live migration is not allowed",
+		},
+		{
+			name:  "Test incorrect MinimumTeeTcbSvn option length",
+			quote: quote12345,
+			opts: &Options{
+				TdQuoteBodyOptions: TdQuoteBodyOptions{
+					MinimumTeeTcbSvn: []byte{1, 2, 3},
+				},
+			},
+			wantErr: "option \"minimum_tee_tcb_svn\" length is 3. Want 16",
 		},
 	}
 
