@@ -221,7 +221,7 @@ func TestTdxQuoteV5(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					AnyMrTd: [][]byte{[]byte{}},
+					AnyMrTd: [][]byte{{}},
 				},
 			},
 			wantErr: "no value in AnyMrTd matched",
@@ -554,7 +554,7 @@ func TestTdxQuote(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				TdQuoteBodyOptions: TdQuoteBodyOptions{
-					AnyMrTd: [][]byte{[]byte{}},
+					AnyMrTd: [][]byte{{}},
 				},
 			},
 			wantErr: "no value in AnyMrTd matched",
