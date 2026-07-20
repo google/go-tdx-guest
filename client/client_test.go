@@ -213,7 +213,7 @@ func TestGetRawQuoteBadSizes(t *testing.T) {
 			outLen = tc.size
 			_, err := GetRawQuote(mock, [64]byte{})
 			if !test.Match(err, tc.wantErr) {
-				t.Fatalf("GetRawQuote(mock, [64]byte{}) = %v. Want err containing: %q", err, tc.wantErr)
+				t.Errorf("GetRawQuote(mock, [64]byte{}) = %v. Want err containing: %q", err, tc.wantErr)
 			}
 		})
 	}
