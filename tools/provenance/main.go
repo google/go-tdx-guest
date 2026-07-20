@@ -24,7 +24,7 @@ const gcsBaseURL = "https://storage.googleapis.com"
 var (
 	ppidFlag       = flag.String("ppid", "", "PPID as a 32-character hex string")
 	quoteFileFlag  = flag.String("quote", "", "Path to a raw binary TDX quote file to extract PPID from")
-	bucketNameFlag = flag.String("bucket", "gca-placeholder-bucket", "The public GCS bucket name to fetch the provenance document from")
+	bucketNameFlag = flag.String("bucket", "confidential-host-registry", "The public GCS bucket name to fetch the provenance document from")
 	outputFlag     = flag.String("out", "", "Path to output file to write provenance data to. Default is stdout.")
 	verboseFlag    = flag.Bool("verbose", false, "Enable verbose output")
 
@@ -157,6 +157,8 @@ func run(baseURL string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stderr, "Fetching provenance for PPID: %s\n", ppid)
 
 	bodyBytes, err := fetchProvenanceData(baseURL, ppid, *bucketNameFlag)
 	if err != nil {
