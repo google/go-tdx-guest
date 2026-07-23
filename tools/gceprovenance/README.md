@@ -28,7 +28,7 @@ This:
 6. Checks the quote `MR_OWNER` against the expected PZID digest.
 7. Writes `tdx_quote.bin` and `host_registry.json`.
 
-Verify a supplied QuoteV4 against explicit GCE instance identity:
+Verify a supplied QuoteV4 or QuoteV5 against explicit GCE instance identity:
 
 ```bash
 ./gceprovenance verify \
@@ -42,8 +42,8 @@ Verify a supplied QuoteV4 against explicit GCE instance identity:
 sudo ./gceprovenance verify-host
 ```
 
-This verifies a QuoteV4, extracts PPID, fetches the host registry document, and
-writes the raw quote and host registry JSON.
+This verifies a QuoteV4 or QuoteV5, extracts PPID, fetches the host registry
+document, and writes the raw quote and host registry JSON.
 
 ## Instance Verification
 
@@ -51,10 +51,10 @@ writes the raw quote and host registry JSON.
 sudo ./gceprovenance verify-instance
 ```
 
-This verifies a QuoteV4, resolves GCE instance identity, and compares the expected
-PZID digest with quote `MR_OWNER`.
+This verifies a QuoteV4 or QuoteV5, resolves GCE instance identity, and compares
+the expected PZID digest with quote `MR_OWNER`.
 
-Verify a supplied QuoteV4:
+Verify a supplied QuoteV4 or QuoteV5:
 
 ```bash
 ./gceprovenance verify-instance \
@@ -79,11 +79,11 @@ checked.
 
 ## Quote Verification Scope
 
-Quote verification authenticates the QuoteV4 using the Intel root certificate
-embedded in this repository. It checks the quote structure, PCK certificate
-chain and validity period, quote signature, QE report signature, and the binding
-between the attestation key and QE report. When `-challenge` is set, it also
-checks the authenticated quote `REPORT_DATA` against that value.
+Quote verification authenticates QuoteV4 and QuoteV5 using the Intel root
+certificate embedded in this repository. It checks the quote structure, PCK
+certificate chain and validity period, quote signature, QE report signature,
+and the binding between the attestation key and QE report. When `-challenge` is
+set, it also checks the authenticated quote `REPORT_DATA` against that value.
 
 The command does not download Intel PCS collateral or evaluate TDX or QE TCB
 status. It also does not check certificate revocation, workload measurements,
@@ -121,7 +121,7 @@ sudo ./gceprovenance verify \
 ## Flags
 
 - `-bucket`: public GCS bucket containing host registry documents. Defaults to `confidential-host-registry`.
-- `-quote`: raw binary TDX QuoteV4. If unset, a local QuoteV4 is fetched.
+- `-quote`: raw binary TDX QuoteV4 or QuoteV5. If unset, a local quote is fetched.
 - `-instance`: GCE instance resource string in the form `projects/<project-number>/zones/<zone>/instances/<instance-id>`.
 - `-MDS`: use the metadata server to collect GCE instance identity. This is the default when `-instance` is unset.
 - `-challenge`: expected quote `REPORT_DATA` as 128 hex characters.

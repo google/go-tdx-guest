@@ -58,14 +58,24 @@ func PZIDDigest(info *InstanceInfo) ([]byte, string, error) {
 
 // MROwnerFromQuote returns the MR_OWNER bytes from a supported TDX quote.
 func MROwnerFromQuote(quote any) ([]byte, error) {
-	q, ok := quote.(*pb.QuoteV4)
-	if !ok {
-		return nil, fmt.Errorf("GCE provenance supports QuoteV4 only, got %T", quote)
+	var mrOwner []byte
+	switch q := quote.(type) {
+	case *pb.QuoteV4:
+		if q.GetTdQuoteBody() == nil {
+			return nil, errors.New("QuoteV4 TD quote body is nil")
+		}
+		mrOwner = q.GetTdQuoteBody().GetMrOwner()
+	case *pb.QuoteV5:
+		if q.GetTdQuoteBodyDescriptor() == nil {
+			return nil, errors.New("QuoteV5 TD quote body descriptor is nil")
+		}
+		if q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5() == nil {
+			return nil, errors.New("QuoteV5 TD quote body is nil")
+		}
+		mrOwner = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetMrOwner()
+	default:
+		return nil, fmt.Errorf("GCE provenance supports QuoteV4 and QuoteV5 only, got %T", quote)
 	}
-	if q.GetTdQuoteBody() == nil {
-		return nil, errors.New("QuoteV4 TD quote body is nil")
-	}
-	mrOwner := q.GetTdQuoteBody().GetMrOwner()
 	if len(mrOwner) != abi.MrOwnerSize {
 		return nil, fmt.Errorf("MR_OWNER length is %d bytes, want %d", len(mrOwner), abi.MrOwnerSize)
 	}

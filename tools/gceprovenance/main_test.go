@@ -9,7 +9,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-tdx-guest/abi"
 	"github.com/google/go-tdx-guest/gce"
+	pb "github.com/google/go-tdx-guest/proto/tdx"
+	"github.com/google/go-tdx-guest/testing/testdata"
 )
 
 func TestParseCommandFlagsDefaults(t *testing.T) {
@@ -90,6 +93,21 @@ func TestParseChallenge(t *testing.T) {
 func TestParseChallengeRejectsWrongLength(t *testing.T) {
 	if _, _, err := parseChallenge("abcd"); err == nil {
 		t.Fatal("parseChallenge() succeeded, want error")
+	}
+}
+
+func TestValidateReportDataSupportsQuoteV5(t *testing.T) {
+	quote, err := abi.QuoteToProto(testdata.RawQuoteV5)
+	if err != nil {
+		t.Fatalf("QuoteToProto(RawQuoteV5) failed: %v", err)
+	}
+	quoteV5, ok := quote.(*pb.QuoteV5)
+	if !ok {
+		t.Fatalf("QuoteToProto(RawQuoteV5) type = %T, want *tdx.QuoteV5", quote)
+	}
+	challenge := quoteV5.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetReportData()
+	if err := validateReportData(quoteV5, challenge); err != nil {
+		t.Fatalf("validateReportData() failed for QuoteV5: %v", err)
 	}
 }
 

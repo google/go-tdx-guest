@@ -153,7 +153,7 @@ func parseCommandFlags(name string, args []string, stderr io.Writer) (commandCon
 		Bucket: defaultBucketName,
 		OutDir: defaultOutDir,
 	}
-	fs.StringVar(&cfg.Quote, "quote", "", "Path to a raw binary TDX quote. If unset, fetches a local quote.")
+	fs.StringVar(&cfg.Quote, "quote", "", "Path to a raw binary TDX QuoteV4 or QuoteV5. If unset, fetches a local quote.")
 	fs.StringVar(&cfg.Bucket, "bucket", defaultBucketName, "Public GCS bucket containing host registry documents.")
 	fs.StringVar(&cfg.Instance, "instance", "", "GCE instance resource string projects/<project-number>/zones/<zone>/instances/<instance-id>.")
 	fs.BoolVar(&cfg.UseMetadata, "MDS", false, "Use the metadata server to collect GCE instance identity. This is the default when -instance is unset.")

@@ -43,7 +43,7 @@ var (
 // PPIDFromQuote extracts the PPID from the PCK certificate embedded in a TDX
 // quote.
 func PPIDFromQuote(quote any) (string, error) {
-	if err := requireQuoteV4(quote); err != nil {
+	if err := requireSupportedQuote(quote); err != nil {
 		return "", err
 	}
 	chain, err := verify.ExtractChainFromQuote(quote)
@@ -75,7 +75,7 @@ func ResolveRawQuote(path string, reportData [64]byte) ([]byte, any, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("parse quote bytes from %s: %w", path, err)
 		}
-		if err := requireQuoteV4(quote); err != nil {
+		if err := requireSupportedQuote(quote); err != nil {
 			return nil, nil, err
 		}
 		return quoteBytes, quote, nil
@@ -96,17 +96,19 @@ func ResolveRawQuote(path string, reportData [64]byte) ([]byte, any, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("parse local TDX quote: %w", err)
 	}
-	if err := requireQuoteV4(quote); err != nil {
+	if err := requireSupportedQuote(quote); err != nil {
 		return nil, nil, err
 	}
 	return quoteBytes, quote, nil
 }
 
-func requireQuoteV4(quote any) error {
-	if _, ok := quote.(*pb.QuoteV4); !ok {
-		return fmt.Errorf("GCE provenance supports QuoteV4 only, got %T", quote)
+func requireSupportedQuote(quote any) error {
+	switch quote.(type) {
+	case *pb.QuoteV4, *pb.QuoteV5:
+		return nil
+	default:
+		return fmt.Errorf("GCE provenance supports QuoteV4 and QuoteV5 only, got %T", quote)
 	}
-	return nil
 }
 
 // FetchProvenanceData fetches a provenance JSON object from the configured

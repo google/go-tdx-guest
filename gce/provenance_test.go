@@ -15,15 +15,16 @@
 package gce
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/google/go-tdx-guest/abi"
+	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
 
@@ -95,28 +96,35 @@ func TestFetchProvenanceDataRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestResolveRawQuoteRejectsQuoteV5(t *testing.T) {
+func TestResolveRawQuoteSupportsQuoteV5(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "quote-v5.bin")
 	if err := os.WriteFile(path, testdata.RawQuoteV5, 0644); err != nil {
 		t.Fatalf("WriteFile(%q) failed: %v", path, err)
 	}
 	var reportData [64]byte
-	if _, _, err := ResolveRawQuote(path, reportData); err == nil {
-		t.Fatal("ResolveRawQuote() succeeded, want QuoteV5 rejection")
-	} else if !strings.Contains(err.Error(), "supports QuoteV4 only") {
-		t.Fatalf("ResolveRawQuote() error = %q, want QuoteV4-only error", err.Error())
+	raw, quote, err := ResolveRawQuote(path, reportData)
+	if err != nil {
+		t.Fatalf("ResolveRawQuote() failed: %v", err)
+	}
+	if !bytes.Equal(raw, testdata.RawQuoteV5) {
+		t.Error("ResolveRawQuote() did not preserve QuoteV5 bytes")
+	}
+	if _, ok := quote.(*pb.QuoteV5); !ok {
+		t.Fatalf("ResolveRawQuote() quote type = %T, want *tdx.QuoteV5", quote)
 	}
 }
 
-func TestPPIDFromQuoteRejectsQuoteV5(t *testing.T) {
+func TestPPIDFromQuoteSupportsQuoteV5(t *testing.T) {
 	quote, err := abi.QuoteToProto(testdata.RawQuoteV5)
 	if err != nil {
 		t.Fatalf("QuoteToProto(RawQuoteV5) failed: %v", err)
 	}
-	if _, err := PPIDFromQuote(quote); err == nil {
-		t.Fatal("PPIDFromQuote() succeeded, want QuoteV5 rejection")
-	} else if !strings.Contains(err.Error(), "supports QuoteV4 only") {
-		t.Fatalf("PPIDFromQuote() error = %q, want QuoteV4-only error", err.Error())
+	got, err := PPIDFromQuote(quote)
+	if err != nil {
+		t.Fatalf("PPIDFromQuote() failed: %v", err)
+	}
+	if want := "2734b654f553596897eaadfb5667a954"; got != want {
+		t.Errorf("PPIDFromQuote() = %q, want %q", got, want)
 	}
 }
 

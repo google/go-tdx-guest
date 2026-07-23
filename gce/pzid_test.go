@@ -17,7 +17,6 @@ package gce
 import (
 	"bytes"
 	"crypto/sha512"
-	"strings"
 	"testing"
 
 	pb "github.com/google/go-tdx-guest/proto/tdx"
@@ -73,17 +72,29 @@ func TestVerifyPZID(t *testing.T) {
 		t.Fatalf("PZIDPayload() failed: %v", err)
 	}
 	digest := sha512.Sum384([]byte(payload))
-	quote := &pb.QuoteV4{TdQuoteBody: &pb.TDQuoteBody{MrOwner: digest[:]}}
-
-	got, err := VerifyPZID(quote, info)
-	if err != nil {
-		t.Fatalf("VerifyPZID() failed: %v", err)
+	quotes := map[string]any{
+		"QuoteV4": &pb.QuoteV4{
+			TdQuoteBody: &pb.TDQuoteBody{MrOwner: digest[:]},
+		},
+		"QuoteV5": &pb.QuoteV5{
+			TdQuoteBodyDescriptor: &pb.TDQuoteBodyDescriptor{
+				TdQuoteBodyV5: &pb.TDQuoteBodyV5{MrOwner: digest[:]},
+			},
+		},
 	}
-	if got.Payload != payload {
-		t.Errorf("VerifyPZID().Payload = %q, want %q", got.Payload, payload)
-	}
-	if !bytes.Equal(got.ExpectedMROwner, digest[:]) {
-		t.Errorf("VerifyPZID().ExpectedMROwner = %x, want %x", got.ExpectedMROwner, digest)
+	for name, quote := range quotes {
+		t.Run(name, func(t *testing.T) {
+			got, err := VerifyPZID(quote, info)
+			if err != nil {
+				t.Fatalf("VerifyPZID() failed: %v", err)
+			}
+			if got.Payload != payload {
+				t.Errorf("VerifyPZID().Payload = %q, want %q", got.Payload, payload)
+			}
+			if !bytes.Equal(got.ExpectedMROwner, digest[:]) {
+				t.Errorf("VerifyPZID().ExpectedMROwner = %x, want %x", got.ExpectedMROwner, digest)
+			}
+		})
 	}
 }
 
@@ -99,10 +110,18 @@ func TestVerifyPZIDRejectsMismatch(t *testing.T) {
 	}
 }
 
-func TestMROwnerFromQuoteRejectsQuoteV5(t *testing.T) {
-	if _, err := MROwnerFromQuote(&pb.QuoteV5{}); err == nil {
-		t.Fatal("MROwnerFromQuote() succeeded, want error")
-	} else if !strings.Contains(err.Error(), "supports QuoteV4 only") {
-		t.Fatalf("MROwnerFromQuote() error = %q, want QuoteV4-only error", err.Error())
+func TestMROwnerFromQuoteSupportsQuoteV5(t *testing.T) {
+	want := bytes.Repeat([]byte{0xab}, sha512.Size384)
+	quote := &pb.QuoteV5{
+		TdQuoteBodyDescriptor: &pb.TDQuoteBodyDescriptor{
+			TdQuoteBodyV5: &pb.TDQuoteBodyV5{MrOwner: want},
+		},
+	}
+	got, err := MROwnerFromQuote(quote)
+	if err != nil {
+		t.Fatalf("MROwnerFromQuote() failed: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("MROwnerFromQuote() = %x, want %x", got, want)
 	}
 }
