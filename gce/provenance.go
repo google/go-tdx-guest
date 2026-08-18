@@ -36,8 +36,9 @@ import (
 const GCSBaseURL = "https://storage.googleapis.com"
 
 var (
-	validPPID   = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
-	validBucket = regexp.MustCompile(`^[a-z0-9_.-]{3,63}$`)
+	validPPID        = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
+	validBucket      = regexp.MustCompile(`^[a-z0-9_.-]{3,63}$`)
+	getQuoteProvider = func() (tg.QuoteProvider, error) { return tg.GetQuoteProvider() }
 )
 
 // PPIDFromQuote extracts the PPID from the PCK certificate embedded in a TDX
@@ -81,7 +82,7 @@ func ResolveRawQuote(path string, reportData [64]byte) ([]byte, any, error) {
 		return quoteBytes, quote, nil
 	}
 
-	qp, err := tg.GetQuoteProvider()
+	qp, err := getQuoteProvider()
 	if err != nil {
 		return nil, nil, fmt.Errorf("get quote provider: %w", err)
 	}

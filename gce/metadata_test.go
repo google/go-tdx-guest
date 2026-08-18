@@ -16,6 +16,7 @@ package gce
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -76,6 +77,16 @@ func TestInstanceInfoLogString(t *testing.T) {
 	want := "gce_instance=projects/123456789012/zones/us-central1-a/instances/112233445566778899 project_id=test-project instance_name=test-instance"
 	if got != want {
 		t.Errorf("InstanceInfo.LogString() = %q, want %q", got, want)
+	}
+}
+
+func TestNilInstanceInfoStrings(t *testing.T) {
+	var info *InstanceInfo
+	if got := info.ResourceString(); got != "" {
+		t.Errorf("nil InstanceInfo.ResourceString() = %q, want empty string", got)
+	}
+	if got := info.LogString(); got != "<nil>" {
+		t.Errorf("nil InstanceInfo.LogString() = %q, want %q", got, "<nil>")
 	}
 }
 
@@ -182,5 +193,15 @@ func TestResolveInstanceInfoFromGCEInstance(t *testing.T) {
 	}
 	if *got != *want {
 		t.Errorf("ResolveInstanceInfo() = %+v, want %+v", got, want)
+	}
+}
+
+func TestResolveInstanceInfoUsesMetadataByDefault(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := ResolveInstanceInfo(ctx, "", false)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("ResolveInstanceInfo() error = %v, want %v", err, context.Canceled)
 	}
 }

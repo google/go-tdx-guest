@@ -24,9 +24,25 @@ import (
 	"testing"
 
 	"github.com/google/go-tdx-guest/abi"
+	tg "github.com/google/go-tdx-guest/client"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	"github.com/google/go-tdx-guest/testing/testdata"
 )
+
+type fakeQuoteProvider struct {
+	raw            []byte
+	reportData     [64]byte
+	supportedErr   error
+	getRawQuoteRan bool
+}
+
+func (p *fakeQuoteProvider) IsSupported() error { return p.supportedErr }
+
+func (p *fakeQuoteProvider) GetRawQuote(reportData [64]byte) ([]byte, error) {
+	p.reportData = reportData
+	p.getRawQuoteRan = true
+	return p.raw, nil
+}
 
 func TestFetchProvenanceData(t *testing.T) {
 	const (
@@ -96,6 +112,26 @@ func TestFetchProvenanceDataRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestFetchProvenanceDataReturnsGCSError(t *testing.T) {
+	const (
+		ppid   = "abcdef1234567890abcdef1234567890"
+		bucket = "test-bucket"
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "NoSuchKey", http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	_, err := FetchProvenanceData(server.URL, ppid, bucket, nil)
+	if err == nil {
+		t.Fatal("FetchProvenanceData() succeeded, want error")
+	}
+	want := "gcs request failed: file 'abcdef1234567890abcdef1234567890' not found in bucket 'test-bucket'"
+	if err.Error() != want {
+		t.Errorf("FetchProvenanceData() error = %q, want %q", err, want)
+	}
+}
+
 func TestResolveRawQuoteSupportsQuoteV5(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "quote-v5.bin")
 	if err := os.WriteFile(path, testdata.RawQuoteV5, 0644); err != nil {
@@ -108,6 +144,32 @@ func TestResolveRawQuoteSupportsQuoteV5(t *testing.T) {
 	}
 	if !bytes.Equal(raw, testdata.RawQuoteV5) {
 		t.Error("ResolveRawQuote() did not preserve QuoteV5 bytes")
+	}
+	if _, ok := quote.(*pb.QuoteV5); !ok {
+		t.Fatalf("ResolveRawQuote() quote type = %T, want *tdx.QuoteV5", quote)
+	}
+}
+
+func TestResolveRawQuoteUsesLocalQuoteProvider(t *testing.T) {
+	provider := &fakeQuoteProvider{raw: testdata.RawQuoteV5}
+	originalGetQuoteProvider := getQuoteProvider
+	getQuoteProvider = func() (tg.QuoteProvider, error) { return provider, nil }
+	t.Cleanup(func() { getQuoteProvider = originalGetQuoteProvider })
+
+	var reportData [64]byte
+	reportData[0] = 0xab
+	raw, quote, err := ResolveRawQuote("", reportData)
+	if err != nil {
+		t.Fatalf("ResolveRawQuote() failed: %v", err)
+	}
+	if !provider.getRawQuoteRan {
+		t.Fatal("ResolveRawQuote() did not request a quote from the local provider")
+	}
+	if provider.reportData != reportData {
+		t.Errorf("local quote provider report data = %x, want %x", provider.reportData, reportData)
+	}
+	if !bytes.Equal(raw, testdata.RawQuoteV5) {
+		t.Error("ResolveRawQuote() did not preserve local QuoteV5 bytes")
 	}
 	if _, ok := quote.(*pb.QuoteV5); !ok {
 		t.Fatalf("ResolveRawQuote() quote type = %T, want *tdx.QuoteV5", quote)
