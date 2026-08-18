@@ -44,6 +44,30 @@ func TestParseCommandFlagsOutDirDefaults(t *testing.T) {
 	}
 }
 
+func TestParseCommandFlagsCustom(t *testing.T) {
+	cfg, err := parseCommandFlags("gceprovenance verify", []string{"-quote", "custom_quote.bin", "-bucket", "custom-bucket"}, io.Discard)
+	if err != nil {
+		t.Fatalf("parseCommandFlags() failed: %v", err)
+	}
+	if cfg.Quote != "custom_quote.bin" {
+		t.Errorf("Quote = %q, want %q", cfg.Quote, "custom_quote.bin")
+	}
+	if cfg.Bucket != "custom-bucket" {
+		t.Errorf("Bucket = %q, want %q", cfg.Bucket, "custom-bucket")
+	}
+}
+
+func TestParseCommandFlagsWritesErrorsToProvidedOutput(t *testing.T) {
+	var output bytes.Buffer
+	_, err := parseCommandFlags("gceprovenance verify", []string{"-unknown"}, &output)
+	if err == nil {
+		t.Fatal("parseCommandFlags() succeeded, want error")
+	}
+	if want := "flag provided but not defined: -unknown"; !strings.Contains(output.String(), want) {
+		t.Errorf("parseCommandFlags() output = %q, want substring %q", output.String(), want)
+	}
+}
+
 func TestRunCLIRejectsFlagsWithoutCommand(t *testing.T) {
 	err := runCLI([]string{"-quote", "quote.bin"}, "", io.Discard, io.Discard)
 	if err == nil {
