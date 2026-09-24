@@ -1697,7 +1697,7 @@ func RootOfTrustToOptions(rot *ccpb.RootOfTrust) (*Options, error) {
 	}, nil
 }
 
-// Parse root certificates from the embedded trusted_root certificate file.
+// Parse root certificate from the embedded trusted_root certificate file.
 func init() {
 	root, _ := pem.Decode(defaultRootCertByte)
 	trustedRootCertificate, _ = x509.ParseCertificate(root.Bytes)
