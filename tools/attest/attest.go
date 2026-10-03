@@ -80,6 +80,15 @@ func marshalAndWriteBytes(quote any, out io.Writer) error {
 			return err
 		}
 		return nil
+	case *pb.QuoteV5:
+		bytes, err := prototext.Marshal(q)
+		if err != nil {
+			return err
+		}
+		if _, err := out.Write(bytes); err != nil {
+			return err
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
