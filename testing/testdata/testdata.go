@@ -29,6 +29,11 @@ var RawQuote []byte
 //go:embed "quote_sample_v5.dat"
 var RawQuoteV5 []byte
 
+// RawQuoteDICE contains raw bytes of DICE quote. To be used only for testing
+//
+//go:embed "quote_sample_dice.dat"
+var RawQuoteDICE []byte
+
 // RawReport contains raw bytes of report. To be used only for testing
 //
 //go:embed "report.dat"
