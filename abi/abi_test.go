@@ -685,6 +685,51 @@ func FuzzQuoteToProto(f *testing.F) {
 	})
 }
 
+// marshalQuote returns the wire encoding of raw parsed with QuoteToProto.
+func marshalQuote(f *testing.F, raw []byte) []byte {
+	f.Helper()
+	quote, err := QuoteToProto(raw)
+	if err != nil {
+		f.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	data, err := proto.Marshal(quote.(proto.Message))
+	if err != nil {
+		f.Fatalf("proto.Marshal() failed: %v", err)
+	}
+	return data
+}
+
+func FuzzQuoteToAbiBytes(f *testing.F) {
+	seeds := [][]byte{
+		marshalQuote(f, test.RawQuote),
+		marshalQuote(f, test.RawQuoteV5),
+		marshalQuote(f, rawQuoteV5TDX10(f)),
+	}
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		for _, quote := range []proto.Message{&pb.QuoteV4{}, &pb.QuoteV5{}} {
+			if err := proto.Unmarshal(data, quote); err != nil {
+				continue
+			}
+			if err := CheckQuote(quote); err != nil {
+				continue
+			}
+			// Any quote that passes CheckQuote must serialize and parse back.
+			abiBytes, err := QuoteToAbiBytes(quote)
+			if err != nil {
+				t.Fatalf("QuoteToAbiBytes() failed on quote accepted by CheckQuote: %v", err)
+			}
+			if _, err := QuoteToProto(abiBytes); err != nil {
+				t.Fatalf("QuoteToProto() failed on QuoteToAbiBytes() output: %v", err)
+			}
+		}
+	})
+}
+
 // firstDiff returns the first offset where a and b differ, or the shorter length.
 func firstDiff(a, b []byte) int {
 	n := len(a)

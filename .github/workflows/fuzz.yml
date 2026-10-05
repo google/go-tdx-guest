@@ -16,6 +16,8 @@ jobs:
         include:
           - pkg: ./abi
             target: FuzzQuoteToProto
+          - pkg: ./abi
+            target: FuzzQuoteToAbiBytes
           - pkg: ./pcs
             target: FuzzPckCertificateExtensions
           - pkg: ./verify
