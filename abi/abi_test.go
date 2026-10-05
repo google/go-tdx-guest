@@ -611,6 +611,125 @@ func FuzzQuoteToProto(f *testing.F) {
 	})
 }
 
+func quoteV4(t *testing.T) *pb.QuoteV4 {
+	t.Helper()
+	quote, err := QuoteToProto(test.RawQuote)
+	if err != nil {
+		t.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	return quote.(*pb.QuoteV4)
+}
+
+func quoteV5(t *testing.T) *pb.QuoteV5 {
+	t.Helper()
+	quote, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		t.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	return quote.(*pb.QuoteV5)
+}
+
+func TestCheckQuoteRejectsTDX15BodySizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	quote.GetTdQuoteBodyDescriptor().TdQuoteBodySize = 0x7FFFFFFF
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a TDX 1.5 body descriptor with the wrong size")
+	}
+}
+
+func TestCheckQuoteRejectsTDX10BodySizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	desc := quote.GetTdQuoteBodyDescriptor()
+	desc.TdQuoteBodyType = tdxVersion10BodyType
+	desc.TdQuoteBodySize = tdQuoteBodySizeV5TDX10
+	desc.GetTdQuoteBodyV5().TeeTcbSvn2 = nil
+	desc.GetTdQuoteBodyV5().MrServiceTd = nil
+	if err := CheckQuote(quote); err != nil {
+		t.Fatalf("CheckQuote() rejected a valid TDX 1.0 body descriptor: %v", err)
+	}
+	desc.TdQuoteBodySize = tdQuoteBodySizeV5TDX15
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a TDX 1.0 body descriptor with the wrong size")
+	}
+}
+
+func TestCheckQuoteRejectsCertificationDataSizeMismatch(t *testing.T) {
+	quote := quoteV4(t)
+	quote.GetSignedData().GetCertificationData().Size++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a certification data size that does not match its contents")
+	}
+}
+
+func TestCheckQuoteRejectsV4SignedDataSizeMismatch(t *testing.T) {
+	quote := quoteV4(t)
+	quote.SignedDataSize++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a SignedDataSize that does not match the signed data")
+	}
+}
+
+func TestCheckQuoteRejectsV5SignedDataSizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	quote.SignedDataSize++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a SignedDataSize that does not match the signed data")
+	}
+}
+
+func TestCheckQuoteRejectsV5NegativeSignedDataSize(t *testing.T) {
+	quote := quoteV5(t)
+	quote.SignedDataSize = -1
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a negative SignedDataSize")
+	}
+}
+
+// marshalQuote returns the wire encoding of raw parsed with QuoteToProto.
+func marshalQuote(f *testing.F, raw []byte) []byte {
+	f.Helper()
+	quote, err := QuoteToProto(raw)
+	if err != nil {
+		f.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	data, err := proto.Marshal(quote.(proto.Message))
+	if err != nil {
+		f.Fatalf("proto.Marshal() failed: %v", err)
+	}
+	return data
+}
+
+func FuzzQuoteToAbiBytes(f *testing.F) {
+	seeds := [][]byte{
+		marshalQuote(f, test.RawQuote),
+		marshalQuote(f, test.RawQuoteV5),
+		marshalQuote(f, rawQuoteV5TDX10(f)),
+	}
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		for _, quote := range []proto.Message{&pb.QuoteV4{}, &pb.QuoteV5{}} {
+			if err := proto.Unmarshal(data, quote); err != nil {
+				continue
+			}
+			if err := CheckQuote(quote); err != nil {
+				continue
+			}
+			// Any quote that passes CheckQuote must serialize and parse back.
+			abiBytes, err := QuoteToAbiBytes(quote)
+			if err != nil {
+				t.Fatalf("QuoteToAbiBytes() failed on quote accepted by CheckQuote: %v", err)
+			}
+			if _, err := QuoteToProto(abiBytes); err != nil {
+				t.Fatalf("QuoteToProto() failed on QuoteToAbiBytes() output: %v", err)
+			}
+		}
+	})
+}
+
 // firstDiff returns the first offset at which a and b differ, or the length of
 // the shorter slice if one is a prefix of the other.
 func firstDiff(a, b []byte) int {
