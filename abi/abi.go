@@ -911,7 +911,24 @@ func checkCertificationData(certification *pb.CertificationData) error {
 	if err := checkQeReportCertificationData(certification.GetQeReportCertificationData()); err != nil {
 		return fmt.Errorf("QE Report certification data error: %v", err)
 	}
+	if want := qeReportCertificationDataSize(certification.GetQeReportCertificationData()); uint64(certification.GetSize()) != want {
+		return fmt.Errorf("certification data size is %d bytes. Expected %d bytes", certification.GetSize(), want)
+	}
 	return nil
+}
+
+// qeReportCertificationDataSize returns the serialized size of a QE report
+// certification data message whose fields have passed checkQeReportCertificationData.
+func qeReportCertificationDataSize(qeReport *pb.QEReportCertificationData) uint64 {
+	return qeReportSize + signatureSize +
+		qeAuthDataKnownSize + uint64(qeReport.GetQeAuthData().GetParsedDataSize()) +
+		pckCertificateChainKnownSize + uint64(qeReport.GetPckCertificateChainData().GetSize())
+}
+
+// signedDataSize returns the serialized size of signed data whose fields have
+// passed checkEcdsa256BitQuoteV4AuthData.
+func signedDataSize(signedData *pb.Ecdsa256BitQuoteV4AuthData) uint64 {
+	return quoteV4AuthDataKnownSize + certificationDataKnownSize + uint64(signedData.GetCertificationData().GetSize())
 }
 
 func checkEcdsa256BitQuoteV4AuthData(signedData *pb.Ecdsa256BitQuoteV4AuthData) error {
@@ -956,6 +973,9 @@ func checkQuoteV4(quote *pb.QuoteV4) error {
 	if err := checkEcdsa256BitQuoteV4AuthData(quote.GetSignedData()); err != nil {
 		return fmt.Errorf("QuoteV4 AuthData error: %v", err)
 	}
+	if want := signedDataSize(quote.GetSignedData()); uint64(quote.GetSignedDataSize()) != want {
+		return fmt.Errorf("QuoteV4 signed data size is %d bytes. Expected %d bytes", quote.GetSignedDataSize(), want)
+	}
 	return nil
 }
 
@@ -969,11 +989,11 @@ func checkQuoteV5(quote *pb.QuoteV5) error {
 	if err := checkTDQuoteBodyDescriptor(quote.GetTdQuoteBodyDescriptor()); err != nil {
 		return fmt.Errorf("quoteV5 TD Quote Body Descriptor error: %v", err)
 	}
-	if quote.GetSignedDataSize() == 0 {
-		return fmt.Errorf("quoteV5 Signed Data Size is 0 bytes. Expected non-zero value")
-	}
 	if err := checkEcdsa256BitQuoteV4AuthData(quote.GetSignedData()); err != nil {
 		return fmt.Errorf("quoteV5 AuthData error: %v", err)
+	}
+	if want := signedDataSize(quote.GetSignedData()); quote.GetSignedDataSize() < 0 || uint64(quote.GetSignedDataSize()) != want {
+		return fmt.Errorf("quoteV5 signed data size is %d bytes. Expected %d bytes", quote.GetSignedDataSize(), want)
 	}
 	return nil
 }
@@ -989,12 +1009,12 @@ func checkTDQuoteBodyDescriptor(tdQuoteBodyDescriptor *pb.TDQuoteBodyDescriptor)
 	// TD quote body type 2(TDX1.0) and 3(TDX1.5) are supported.
 	switch tdQuoteBodyDescriptor.GetTdQuoteBodyType() {
 	case tdxVersion10BodyType:
-		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() < tdQuoteBodySizeV5TDX10 {
-			return fmt.Errorf("td quote body size is %d bytes. Expected minimum %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), 584)
+		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() != tdQuoteBodySizeV5TDX10 {
+			return fmt.Errorf("td quote body size is %d bytes. Expected %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), tdQuoteBodySizeV5TDX10)
 		}
 	case tdxVersion15BodyType:
-		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() < tdQuoteBodySizeV5TDX15 {
-			return fmt.Errorf("td quote body size is %d bytes. Expected minimum %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), 648)
+		if tdQuoteBodyDescriptor.GetTdQuoteBodySize() != tdQuoteBodySizeV5TDX15 {
+			return fmt.Errorf("td quote body size is %d bytes. Expected %d bytes", tdQuoteBodyDescriptor.GetTdQuoteBodySize(), tdQuoteBodySizeV5TDX15)
 		}
 	default:
 		return fmt.Errorf("unsupported TD quote body type , got %d", tdQuoteBodyDescriptor.GetTdQuoteBodyType())
