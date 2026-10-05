@@ -17,6 +17,7 @@ package abi
 import (
 	"bytes"
 	"encoding/binary"
+	"os"
 	"testing"
 
 	pb "github.com/google/go-tdx-guest/proto/tdx"
@@ -516,4 +517,111 @@ func TestInvalidConversionsToAbiBytes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// rawQuoteV5TDX10 returns test.RawQuoteV5 with a TDX 1.0 body.
+func rawQuoteV5TDX10(f *testing.F) []byte {
+	f.Helper()
+	quote, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		f.Fatalf("QuoteToProto(RawQuoteV5) failed: %v", err)
+	}
+	v5, ok := quote.(*pb.QuoteV5)
+	if !ok {
+		f.Fatalf("QuoteToProto(RawQuoteV5) returned %T, want *pb.QuoteV5", quote)
+	}
+	body := v5.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5()
+	raw, err := QuoteToAbiBytes(&pb.QuoteV5{
+		Header: v5.GetHeader(),
+		TdQuoteBodyDescriptor: &pb.TDQuoteBodyDescriptor{
+			TdQuoteBodyType: tdxVersion10BodyType,
+			TdQuoteBodySize: tdQuoteBodySizeV5TDX10,
+			TdQuoteBodyV5: &pb.TDQuoteBodyV5{
+				TeeTcbSvn:      body.GetTeeTcbSvn(),
+				MrSeam:         body.GetMrSeam(),
+				MrSignerSeam:   body.GetMrSignerSeam(),
+				SeamAttributes: body.GetSeamAttributes(),
+				TdAttributes:   body.GetTdAttributes(),
+				Xfam:           body.GetXfam(),
+				MrTd:           body.GetMrTd(),
+				MrConfigId:     body.GetMrConfigId(),
+				MrOwner:        body.GetMrOwner(),
+				MrOwnerConfig:  body.GetMrOwnerConfig(),
+				Rtmrs:          body.GetRtmrs(),
+				ReportData:     body.GetReportData(),
+			},
+		},
+		SignedDataSize: v5.GetSignedDataSize(),
+		SignedData:     v5.GetSignedData(),
+	})
+	if err != nil {
+		f.Fatalf("QuoteToAbiBytes() failed: %v", err)
+	}
+	return raw
+}
+
+func ccelQuote(f *testing.F) []byte {
+	f.Helper()
+	raw, err := os.ReadFile("../testing/testdata/ccel/cos-113-tdx-quote.dat")
+	if err != nil {
+		f.Fatalf("ReadFile() failed: %v", err)
+	}
+	return raw
+}
+
+func FuzzQuoteToProto(f *testing.F) {
+	seeds := [][]byte{
+		test.RawQuote,
+		test.RawQuoteV5,
+		rawQuoteV5TDX10(f),
+		ccelQuote(f),
+	}
+	for _, seed := range seeds {
+		if _, err := QuoteToProto(seed); err != nil {
+			f.Fatalf("QuoteToProto() failed on seed: %v", err)
+		}
+		f.Add(seed)
+	}
+	f.Add([]byte{})
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		quote, err := QuoteToProto(data)
+		if err != nil {
+			return
+		}
+		if quote == nil {
+			t.Fatal("QuoteToProto() returned nil quote without error")
+		}
+		// Any accepted input must serialize back to the same bytes.
+		abiBytes, err := QuoteToAbiBytes(quote)
+		if err != nil {
+			t.Fatalf("QuoteToAbiBytes() failed on quote parsed by QuoteToProto: %v", err)
+		}
+		if !bytes.Equal(data, abiBytes) {
+			t.Errorf("QuoteToAbiBytes() round-trip mismatch: got %d bytes, want %d bytes; first difference at offset %d", len(abiBytes), len(data), firstDiff(data, abiBytes))
+		}
+		// And re-parse to the same message.
+		reparsed, err := QuoteToProto(abiBytes)
+		if err != nil {
+			t.Fatalf("QuoteToProto() failed on QuoteToAbiBytes() output: %v", err)
+		}
+		if !proto.Equal(quote.(proto.Message), reparsed.(proto.Message)) {
+			t.Errorf("QuoteToProto() re-parse differs from original")
+		}
+	})
+}
+
+// firstDiff returns the first offset at which a and b differ, or the length of
+// the shorter slice if one is a prefix of the other.
+func firstDiff(a, b []byte) int {
+	n := len(a)
+	if len(b) < n {
+		n = len(b)
+	}
+	for i := 0; i < n; i++ {
+		if a[i] != b[i] {
+			return i
+		}
+	}
+	return n
 }
