@@ -271,6 +271,9 @@ func determineQuoteFormat(b []uint8) (uint32, error) {
 	if len(b) < headerVersionEnd {
 		return 0, fmt.Errorf("unable to determine quote format since bytes length is less than %d bytes", headerVersionEnd)
 	}
+	if isDiceQuoteBytes(b) {
+		return QuoteVersionDICE, nil
+	}
 	data := clone(b)
 	header := &pb.Header{}
 	header.Version = uint32(binary.LittleEndian.Uint16(data[headerVersionStart:headerVersionEnd]))
@@ -278,7 +281,7 @@ func determineQuoteFormat(b []uint8) (uint32, error) {
 }
 
 // QuoteToProto creates a Quote from the Intel's attestation quote byte array in Intel's ABI format.
-// Supported quote formats - QuoteV4.
+// Supported quote formats - QuoteV4, QuoteV5, DiceQuote.
 func QuoteToProto(b []uint8) (any, error) {
 	if len(b) == 0 {
 		return nil, ErrRawQuoteEmpty
@@ -292,6 +295,8 @@ func QuoteToProto(b []uint8) (any, error) {
 		return quoteToProtoV4(b)
 	case intelQuoteV5Version:
 		return quoteToProtoV5(b)
+	case QuoteVersionDICE:
+		return quoteToProtoDICE(b)
 	default:
 		return nil, fmt.Errorf("quote format not supported")
 	}
@@ -937,6 +942,8 @@ func CheckQuote(quote any) error {
 		return checkQuoteV4(q)
 	case *pb.QuoteV5:
 		return checkQuoteV5(q)
+	case *pb.DiceQuote:
+		return checkDiceQuote(q)
 	default:
 		return fmt.Errorf("unsupported quote type: %T", quote)
 	}
@@ -1183,7 +1190,7 @@ func signedDataToAbiBytes(signedData *pb.Ecdsa256BitQuoteV4AuthData) ([]byte, er
 }
 
 // QuoteToAbiBytes translates the Quote back into its little-endian ABI format.
-// Supported quote formats - QuoteV4.
+// Supported quote formats - QuoteV4, QuoteV5, DiceQuote.
 func QuoteToAbiBytes(quote any) ([]byte, error) {
 	if quote == nil {
 		return nil, ErrQuoteNil
@@ -1193,6 +1200,8 @@ func QuoteToAbiBytes(quote any) ([]byte, error) {
 		return quoteToAbiBytesV4(q)
 	case *pb.QuoteV5:
 		return quoteToAbiBytesV5(q)
+	case *pb.DiceQuote:
+		return quoteToAbiBytesDICE(q)
 	default:
 		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}
