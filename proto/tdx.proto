@@ -200,3 +200,44 @@ message EnclaveReport {
   bytes reserved4 = 11;    // should be 60 bytes
   bytes report_data = 12;  // should be 64 bytes
 }
+
+// DiceQuote represents a DICE-based TDX attestation quote encoded as a
+// CBOR Web Token (CWT, RFC 8392) wrapping a COSE_Sign1 (RFC 9052) structure.
+message DiceQuote {
+  // Raw CBOR-encoded protected header from the COSE_Sign1 structure.
+  bytes protected_header = 1;
+
+  // COSE algorithm identifier from the protected header (e.g., -35 for ES384).
+  int64 algorithm = 2;
+
+  // Key identifier (kid) from the COSE_Sign1 unprotected header.
+  bytes key_id = 3;
+
+  // Content type from the COSE_Sign1 unprotected header (e.g., "application/eat+cwt").
+  string content_type = 4;
+
+  // DER-encoded X.509 certificates from the COSE_Sign1 unprotected header (x5bag/x5chain).
+  repeated bytes cert_chain = 5;
+
+  // Raw CBOR-encoded CWT payload bytes signed by the COSE_Sign1 signature.
+  bytes raw_payload = 6;
+
+  // CWT issuer claim (key 1).
+  string issuer = 7;
+
+  // CWT subject claim (key 2).
+  string subject = 8;
+
+  // EAT profile OID claim (key 265).
+  string eat_profile = 9;
+
+  // Parsed TD quote body measurements extracted from the CWT payload claims.
+  TDQuoteBodyV5 td_quote_body = 10;
+
+  // ECDSA P-384 signature (96 bytes: r || s) from the COSE_Sign1 structure.
+  bytes signature = 11;
+
+  // Original raw CBOR quote bytes for ABI round-trip serialization.
+  bytes raw_quote = 12;
+}
+
