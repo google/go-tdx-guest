@@ -200,3 +200,53 @@ message EnclaveReport {
   bytes reserved4 = 11;    // should be 60 bytes
   bytes report_data = 12;  // should be 64 bytes
 }
+
+// DiceQuote represents a DICE-based TDX attestation quote encoded as a
+// CBOR Web Token (CWT) wrapping a COSE_Sign1 structure with CoRIM Tagged
+// Concise Evidence claims.
+//
+// References:
+// - IETF RFC 8392 (CBOR Web Token - CWT): https://www.rfc-editor.org/rfc/rfc8392
+// - IETF RFC 9052 (COSE_Sign1): https://www.rfc-editor.org/rfc/rfc9052
+// - IETF RFC 9711 (Entity Attestation Token - EAT): https://www.rfc-editor.org/rfc/rfc9711
+// - IETF CoRIM (Concise Reference Integrity Manifest): https://datatracker.ietf.org/doc/draft-ietf-rats-corim/
+message DiceQuote {
+  // Raw CBOR-encoded protected header bstr (COSE_Sign1 element 0), preserved
+  // for reconstructing COSE Sig_structure during signature verification.
+  bytes protected_header = 1;
+
+  // COSE algorithm identifier from the protected header (e.g., -35 for ES384).
+  int64 algorithm = 2;
+
+  // Key identifier (kid, label 4) from the COSE_Sign1 unprotected header.
+  bytes key_id = 3;
+
+  // Content type (label 3) from the COSE_Sign1 unprotected header (e.g., "application/eat+cwt").
+  string content_type = 4;
+
+  // DER-encoded X.509 certificates from the COSE_Sign1 unprotected header (x5bag label 32 / x5chain label 33).
+  repeated bytes cert_chain = 5;
+
+  // Raw CBOR-encoded CWT payload bstr (COSE_Sign1 element 2) signed by the
+  // COSE_Sign1 signature and containing the CWT/EAT claims map.
+  bytes raw_payload = 6;
+
+  // CWT issuer claim (key 1).
+  string issuer = 7;
+
+  // CWT subject claim (key 2).
+  string subject = 8;
+
+  // EAT profile OID claim (key 265).
+  string eat_profile = 9;
+
+  // Parsed TD quote body measurements extracted from the CWT payload claims.
+  // DICE attestation targets TDX 1.5+ and includes origin/current TEE TCB SVNs
+  // (tee_tcb_svn, tee_tcb_svn2) and Service TD measurement (mr_service_td), so
+  // TDQuoteBodyV5 is used rather than legacy TDX 1.0 TDQuoteBody (QuoteV4).
+  TDQuoteBodyV5 td_quote_body = 10;
+
+  // ECDSA P-384 signature (96 bytes: r || s, COSE_Sign1 element 3).
+  bytes signature = 11;
+}
+
