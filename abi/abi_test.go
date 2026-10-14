@@ -517,3 +517,77 @@ func TestInvalidConversionsToAbiBytes(t *testing.T) {
 		})
 	}
 }
+
+func quoteV4(t *testing.T) *pb.QuoteV4 {
+	t.Helper()
+	quote, err := QuoteToProto(test.RawQuote)
+	if err != nil {
+		t.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	return quote.(*pb.QuoteV4)
+}
+
+func quoteV5(t *testing.T) *pb.QuoteV5 {
+	t.Helper()
+	quote, err := QuoteToProto(test.RawQuoteV5)
+	if err != nil {
+		t.Fatalf("QuoteToProto() failed: %v", err)
+	}
+	return quote.(*pb.QuoteV5)
+}
+
+func TestCheckQuoteRejectsTDX15BodySizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	quote.GetTdQuoteBodyDescriptor().TdQuoteBodySize = 0x7FFFFFFF
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a TDX 1.5 body descriptor with the wrong size")
+	}
+}
+
+func TestCheckQuoteRejectsTDX10BodySizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	desc := quote.GetTdQuoteBodyDescriptor()
+	desc.TdQuoteBodyType = tdxVersion10BodyType
+	desc.TdQuoteBodySize = tdQuoteBodySizeV5TDX10
+	desc.GetTdQuoteBodyV5().TeeTcbSvn2 = nil
+	desc.GetTdQuoteBodyV5().MrServiceTd = nil
+	if err := CheckQuote(quote); err != nil {
+		t.Fatalf("CheckQuote() rejected a valid TDX 1.0 body descriptor: %v", err)
+	}
+	desc.TdQuoteBodySize = tdQuoteBodySizeV5TDX15
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a TDX 1.0 body descriptor with the wrong size")
+	}
+}
+
+func TestCheckQuoteRejectsCertificationDataSizeMismatch(t *testing.T) {
+	quote := quoteV4(t)
+	quote.GetSignedData().GetCertificationData().Size++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a certification data size that does not match its contents")
+	}
+}
+
+func TestCheckQuoteRejectsV4SignedDataSizeMismatch(t *testing.T) {
+	quote := quoteV4(t)
+	quote.SignedDataSize++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a SignedDataSize that does not match the signed data")
+	}
+}
+
+func TestCheckQuoteRejectsV5SignedDataSizeMismatch(t *testing.T) {
+	quote := quoteV5(t)
+	quote.SignedDataSize++
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a SignedDataSize that does not match the signed data")
+	}
+}
+
+func TestCheckQuoteRejectsV5NegativeSignedDataSize(t *testing.T) {
+	quote := quoteV5(t)
+	quote.SignedDataSize = -1
+	if err := CheckQuote(quote); err == nil {
+		t.Error("CheckQuote() accepted a negative SignedDataSize")
+	}
+}
