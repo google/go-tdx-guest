@@ -37,15 +37,13 @@ type ParseTdxCcelOpts struct {
 	ExtractOpt   extract.Opts
 }
 
-func getRtmrsFromTdQuoteV4(quote *tdxpb.QuoteV4) (*register.RTMRBank, error) {
+func rtmrBankFromSlice(rtmrs [][]byte) (*register.RTMRBank, error) {
 	bank := register.RTMRBank{}
-	rtmrs := quote.TdQuoteBody.Rtmrs
 	for index, rtmr := range rtmrs {
 		bank.RTMRs = append(bank.RTMRs, register.RTMR{
 			Index:  int(index),
 			Digest: rtmr,
 		})
-		// Tdx Quote V4 has a maximum of 4 RTMRs
 		if index > 3 {
 			return nil, fmt.Errorf("too many RTMRs in quote")
 		}
@@ -58,11 +56,9 @@ func getRtmrsFromTdQuoteV4(quote *tdxpb.QuoteV4) (*register.RTMRBank, error) {
 func GetRtmrsFromTdQuote(quote interface{}) (*register.RTMRBank, error) {
 	switch q := quote.(type) {
 	case *tdxpb.QuoteV4:
-		rtmrs, err := getRtmrsFromTdQuoteV4(q)
-		if err != nil {
-			return nil, err
-		}
-		return rtmrs, nil
+		return rtmrBankFromSlice(q.GetTdQuoteBody().GetRtmrs())
+	case *tdxpb.QuoteV5:
+		return rtmrBankFromSlice(q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetRtmrs())
 	default:
 		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}

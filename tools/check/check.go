@@ -98,6 +98,10 @@ var (
 	reportdata     = cmdline.Bytes("-report_data", abi.ReportDataSize, reportdataS)
 	minteetcbsvnS  = flag.String("minimum_tee_tcb_svn", "", "The minimum acceptable value for TEE_TCB_SVN field as a hex string. Must encode 16 bytes. Unchecked if unset.")
 	minteetcbsvn   = cmdline.Bytes("-minimum_tee_tcb_svn", abi.TeeTcbSvnSize, minteetcbsvnS)
+	minteetcbsvn2S = flag.String("minimum_tee_tcb_svn2", "", "The minimum acceptable value for TEE_TCB_SVN2 field (V5 TDX 1.5 only) as a hex string. Must encode 16 bytes. Unchecked if unset.")
+	minteetcbsvn2  = cmdline.Bytes("-minimum_tee_tcb_svn2", abi.TeeTcbSvn2SizeV5, minteetcbsvn2S)
+	mrservicetdS   = flag.String("mr_service_td", "", "The expected MR_SERVICE_TD field (V5 TDX 1.5 only) as a hex string. Must encode 48 bytes. Unchecked if unset.")
+	mrservicetd    = cmdline.Bytes("-mr_service_td", abi.MrServiceTdSizeV5, mrservicetdS)
 
 	rtmrs = flag.String("rtmrs", "",
 		"Comma-separated hex strings representing expected values of RTMRS field. Expected 4 strings, either empty or each must encode 48 bytes. Unchecked if unset")
@@ -138,17 +142,25 @@ func parseQuote(b []byte) (any, error) {
 	case "bin":
 		return parseQuoteBytes(b)
 	case "proto":
-		result := &pb.QuoteV4{}
-		if err := proto.Unmarshal(b, result); err != nil {
+		resultV4 := &pb.QuoteV4{}
+		if err := proto.Unmarshal(b, resultV4); err == nil && resultV4.GetHeader() != nil {
+			return resultV4, nil
+		}
+		resultV5 := &pb.QuoteV5{}
+		if err := proto.Unmarshal(b, resultV5); err != nil {
 			return nil, fmt.Errorf("could not parse %q as proto: %v", *infile, err)
 		}
-		return result, nil
+		return resultV5, nil
 	case "textproto":
-		result := &pb.QuoteV4{}
-		if err := prototext.Unmarshal(b, result); err != nil {
+		resultV4 := &pb.QuoteV4{}
+		if err := prototext.Unmarshal(b, resultV4); err == nil && resultV4.GetHeader() != nil {
+			return resultV4, nil
+		}
+		resultV5 := &pb.QuoteV5{}
+		if err := prototext.Unmarshal(b, resultV5); err != nil {
 			return nil, fmt.Errorf("could not parse %q as textproto: %v", *infile, err)
 		}
-		return result, nil
+		return resultV5, nil
 	default:
 		return nil, fmt.Errorf("unknown value -inform=%s", *inform)
 	}
@@ -367,6 +379,8 @@ func populateConfig() error {
 	setNonNil(&policy.TdQuoteBodyPolicy.MrOwner, *mrowner)
 	setNonNil(&policy.TdQuoteBodyPolicy.MrOwnerConfig, *mrownerconfig)
 	setNonNil(&policy.TdQuoteBodyPolicy.ReportData, *reportdata)
+	setNonNil(&policy.TdQuoteBodyPolicy.MinimumTeeTcbSvn2, *minteetcbsvn2)
+	setNonNil(&policy.TdQuoteBodyPolicy.MrServiceTd, *mrservicetd)
 
 	return multierr.Combine(
 		setUint32(&policy.HeaderPolicy.MinimumQeSvn, "minimum_qe_svn", *minqesvn, defaultMinQeSvn),
