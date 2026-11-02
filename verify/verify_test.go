@@ -1306,3 +1306,26 @@ func TestDisableTcbStatusCheckOption(t *testing.T) {
 		t.Errorf("verifyQuote() with DisableTcbStatusCheck=false got %v, want error containing %v", err, ErrTdxTcbStatus)
 	}
 }
+
+func FuzzRawTdxQuote(f *testing.F) {
+	// Both sample quotes' PCK chains are valid on this date.
+	now := time.Date(2026, time.February, 3, 1, 0, 0, 0, time.UTC)
+	// tdxQuote writes into Options, so each call needs its own.
+	opts := func() *Options {
+		return &Options{
+			GetCollateral: false,
+			Now:           testTimeSet(now),
+		}
+	}
+	for _, raw := range [][]byte{testdata.RawQuote, testdata.RawQuoteV5} {
+		if err := RawTdxQuote(raw, opts()); err != nil {
+			f.Fatalf("RawTdxQuote() failed on seed: %v", err)
+		}
+		f.Add(raw)
+	}
+	f.Add([]byte{})
+
+	f.Fuzz(func(_ *testing.T, data []byte) {
+		RawTdxQuote(data, opts())
+	})
+}
