@@ -34,6 +34,11 @@ var RawQuoteV5 []byte
 //go:embed "quote_sample_dice.dat"
 var RawQuoteDICE []byte
 
+// RawQuoteDICESpec contains raw bytes of a synthetic DICE quote for CBOR parsing tests. To be used only for testing
+//
+//go:embed "quote_sample_dice_spec.dat"
+var RawQuoteDICESpec []byte
+
 // RawReport contains raw bytes of report. To be used only for testing
 //
 //go:embed "report.dat"
