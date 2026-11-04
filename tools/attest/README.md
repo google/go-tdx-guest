@@ -1,13 +1,12 @@
 # `attest` CLI tool
 
-This binary is a thin wrapper around the `client` library to gather attestation
-reports in either binary or textproto formats.
+This binary is a thin wrapper around the `client` library to gather TDX quotes
+in either binary or textproto formats.
 
 The tool's input is the intended `REPORT_DATA` contents, which is 64 bytes of
-user-provided data to include in the attestation report. This is typically a
-nonce.
+user-provided data to include in the TDX quote. This is typically a nonce.
 
-The tool's output is the report in any specified format to either standard out
+The tool's output is the TDX quote in any specified format to either standard out
 or directly to a file.
 
 *Note*: For Ubuntu images, the `tdx_guest` module was moved to linux-modules-extra
@@ -34,8 +33,10 @@ sudo modprobe tdx_guest
 
 ### `-in`
 
-This flag provides a string of 64 bytes `REPORT_DATA` content directly on the command line to include in the output attestation report.
-REPORT_DATA can be either in base64 or hex format. If -inform=auto, first check with base64, hex and last with auto.
+This flag provides a string of 64 bytes `REPORT_DATA` content directly on the
+command line to include in the output TDX quote.
+REPORT_DATA can be either in base64 or hex format. If `-inform=auto`, first check
+with base64, hex and last with auto.
 
 ### `-inform`
 
@@ -58,7 +59,7 @@ Default value is `bin`.
 
 ### `-out`
 
-Path to output file to write attestation report to.
+Path to output file to write TDX quote to.
 
 Default is empty, interpreted as stdout.
 

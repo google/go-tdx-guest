@@ -72,8 +72,16 @@ func TestMain(m *testing.M) {
 }
 
 func withBaseArgs(config string, args ...string) []string {
+	return withBaseArgsQuote("../../testing/testdata/tdx_prod_quote_SPR_E4.dat", config, args...)
+}
+
+func withBaseArgsV5(config string, args ...string) []string {
+	return withBaseArgsQuote("../../testing/testdata/quote_sample_v5.dat", config, args...)
+}
+
+func withBaseArgsQuote(quotePath, config string, args ...string) []string {
 	base := []string{
-		"-in", "../../testing/testdata/tdx_prod_quote_SPR_E4.dat",
+		"-in", quotePath,
 		"-test_local_getter",
 	}
 
@@ -371,6 +379,93 @@ func TestNetworkFlags(t *testing.T) {
 	cmd := exec.Command(check, withBaseArgs("", fmt.Sprintf("-%s=%s", "check_crl", "true"))...)
 	if output, err := cmd.CombinedOutput(); err == nil {
 		t.Errorf("%s check_crl flag succeeded unexpectedly: %v, %s", cmd, err, output)
+	}
+}
+
+func testCasesV5() []testCase {
+	return []testCase{
+		{
+			flag: "minimum_qe_svn",
+			good: "0",
+			bad: []string{
+				"1",
+			},
+			setter: uint32setter("minimum_qe_svn", "header_policy"),
+		},
+		{
+			flag:   "qe_vendor_id",
+			good:   "939a7233f79c4ca9940a0db3957f0607",
+			bad:    []string{"00000000000000000000000000000001"},
+			setter: bytesSetter("qe_vendor_id", "header_policy"),
+		},
+		{
+			flag:   "minimum_tee_tcb_svn",
+			good:   "0b010400000000000000000000000000",
+			bad:    []string{"0b010400000000000000000000000011"},
+			setter: bytesSetter("minimum_tee_tcb_svn", "td_quote_body_policy"),
+		},
+		{
+			flag: "mr_seam",
+			good: "7bf063280e94fb051f5dd7b1fc59ce9aac42bb961df8d44b709c9b0ff87a7b4df648657ba6d1189589feab1d5a3c9a9d",
+			bad: []string{
+				"7bf063280e94fb051f5dd7b1fc59ce9aac42bb961df8d44b709c9b0ff87a7b4df648657ba6d1189589feab1d5a3c0000"},
+			setter: bytesSetter("mr_seam", "td_quote_body_policy"),
+		},
+		{
+			flag:   "td_attributes",
+			good:   "0000001000000000",
+			bad:    []string{"0000001000000011"},
+			setter: bytesSetter("td_attributes", "td_quote_body_policy"),
+		},
+		{
+			flag: "mr_td",
+			good: "7348651a34b2d2d3462822e3a750ec6110125f36757c78480bbfc69cc0d21fb001a1ced3ee19747dda8f750c3bc8f876",
+			bad: []string{
+				"7348651a34b2d2d3462822e3a750ec6110125f36757c78480bbfc69cc0d21fb001a1ced3ee19747dda8f750c3bc80000"},
+			setter: bytesSetter("mr_td", "td_quote_body_policy"),
+		},
+		{
+			flag:   "report_data",
+			good:   "945eaacf5abc1f719d8666a942fda03d1edcb4490277396093dc5a5289ab9f1e094aed63060cd4a4933a4dd537ed1255c9c79ecb3ed82cd1b486233e31c25c3a",
+			bad:    []string{"945eaacf5abc1f719d8666a942fda03d1edcb4490277396093dc5a5289ab9f1e094aed63060cd4a4933a4dd537ed1255c9c79ecb3ed82cd1b486233e31c20000"},
+			setter: bytesSetter("report_data", "td_quote_body_policy"),
+		},
+		{
+			flag:   "minimum_tee_tcb_svn2",
+			good:   "0d010400000000000000000000000000",
+			bad:    []string{"0d010400000000000000000000000011"},
+			setter: bytesSetter("minimum_tee_tcb_svn2", "td_quote_body_policy"),
+		},
+		{
+			flag:   "mr_service_td",
+			good:   "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+			bad:    []string{"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011"},
+			setter: bytesSetter("mr_service_td", "td_quote_body_policy"),
+		},
+	}
+}
+
+func TestCheckGoodFlagsV5(t *testing.T) {
+	for _, tc := range testCasesV5() {
+		t.Run(tc.flag, func(t *testing.T) {
+			cmd := exec.Command(check, withBaseArgsV5("", fmt.Sprintf("-%s=%s", tc.flag, tc.good))...)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Errorf("%s failed unexpectedly: %v (%s)", cmd, err, output)
+			}
+		})
+	}
+}
+
+func TestCheckBadFlagsV5(t *testing.T) {
+	for _, tc := range testCasesV5() {
+		for i, bad := range tc.bad {
+			t.Run(fmt.Sprintf("%s[%d]", tc.flag, i+1), func(t *testing.T) {
+				cmd := exec.Command(check, withBaseArgsV5("", fmt.Sprintf("-%s=%s", tc.flag, bad))...)
+				if output, err := cmd.CombinedOutput(); err == nil {
+					t.Errorf("%s succeeded unexpectedly: %s", cmd, output)
+				}
+			})
+		}
 	}
 }
 
