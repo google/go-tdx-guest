@@ -17,7 +17,6 @@ package abi
 import (
 	"bytes"
 	"encoding/binary"
-	"os"
 	"testing"
 
 	pb "github.com/google/go-tdx-guest/proto/tdx"
@@ -634,21 +633,12 @@ func rawQuoteV5TDX10(f *testing.F) []byte {
 	return raw
 }
 
-func ccelQuote(f *testing.F) []byte {
-	f.Helper()
-	raw, err := os.ReadFile("../testing/testdata/ccel/cos-113-tdx-quote.dat")
-	if err != nil {
-		f.Fatalf("ReadFile() failed: %v", err)
-	}
-	return raw
-}
-
 func FuzzQuoteToProto(f *testing.F) {
 	seeds := [][]byte{
 		test.RawQuote,
 		test.RawQuoteV5,
 		rawQuoteV5TDX10(f),
-		ccelQuote(f),
+		test.RawQuoteCCEL,
 	}
 	for _, seed := range seeds {
 		if _, err := QuoteToProto(seed); err != nil {
