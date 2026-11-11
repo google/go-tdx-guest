@@ -39,6 +39,11 @@ var RawQuoteDICE []byte
 //go:embed "quote_sample_dice_spec.dat"
 var RawQuoteDICESpec []byte
 
+// RawQuoteCCEL contains raw bytes of a CCEL quote. Use only for testing.
+//
+//go:embed "ccel/cos-113-tdx-quote.dat"
+var RawQuoteCCEL []byte
+
 // RawReport contains raw bytes of report. To be used only for testing
 //
 //go:embed "report.dat"
