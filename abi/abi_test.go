@@ -702,19 +702,24 @@ func FuzzQuoteToAbiBytes(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		for _, quote := range []proto.Message{&pb.QuoteV4{}, &pb.QuoteV5{}} {
-			if err := proto.Unmarshal(data, quote); err != nil {
+			// The ABI encoding has no unknown fields, so a round-trip cannot keep them.
+			if err := (proto.UnmarshalOptions{DiscardUnknown: true}).Unmarshal(data, quote); err != nil {
 				continue
 			}
 			if err := CheckQuote(quote); err != nil {
 				continue
 			}
-			// Any quote that passes CheckQuote must serialize and parse back.
+			// Any quote that passes CheckQuote must serialize and parse back to the same message.
 			abiBytes, err := QuoteToAbiBytes(quote)
 			if err != nil {
 				t.Fatalf("QuoteToAbiBytes() failed on quote accepted by CheckQuote: %v", err)
 			}
-			if _, err := QuoteToProto(abiBytes); err != nil {
+			reparsed, err := QuoteToProto(abiBytes)
+			if err != nil {
 				t.Fatalf("QuoteToProto() failed on QuoteToAbiBytes() output: %v", err)
+			}
+			if !proto.Equal(quote, reparsed.(proto.Message)) {
+				t.Errorf("QuoteToProto(QuoteToAbiBytes(quote)) differs from quote:\ngot:  %v\nwant: %v", reparsed, quote)
 			}
 		}
 	})
