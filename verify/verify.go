@@ -1128,6 +1128,14 @@ func checkTcbInfoTcbStatus(tcbInfo pcs.TcbInfo, tdQuoteBody any, pckCertExtensio
 	if found.TcbStatus != pcs.TcbComponentStatusUpToDate {
 		return fmt.Errorf("TDX TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, found.TcbStatus)
 	}
+	// Both the matching TCB level and the matching TDX Module TCB level must be UpToDate.
+	// tdxModuleTcbStatus is UpToDate when teeTcbSvn[1] is 0, as no TDX Module TCB level is matched then.
+	if tdxModuleTcbStatus == pcs.TcbComponentStatusOutOfDate {
+		return ErrTdxTcbStatus
+	}
+	if tdxModuleTcbStatus != pcs.TcbComponentStatusUpToDate {
+		return fmt.Errorf("TDX Module TCB Status is not %q, found %q", pcs.TcbComponentStatusUpToDate, tdxModuleTcbStatus)
+	}
 
 	return nil
 }
