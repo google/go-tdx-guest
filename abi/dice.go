@@ -176,11 +176,11 @@ func isDiceQuoteBytes(b []byte) bool {
 		(b[0] == cborTagCOSESign1Raw && b[1] == cborArray4Prefix)
 }
 
-// parseDiceQuoteEnvelope decodes the outer CWT / COSE_Sign1 CBOR envelope,
+// ParseDiceQuoteEnvelope decodes the outer CWT / COSE_Sign1 CBOR envelope,
 // COSE protected/unprotected headers, and top-level CWT claims (iss, sub,
 // eat_profile, report_data), and performs structural, format, and field-size
 // checks.
-func parseDiceQuoteEnvelope(b []byte) (*pb.DiceQuote, map[any]any, error) {
+func ParseDiceQuoteEnvelope(b []byte) (*pb.DiceQuote, map[any]any, error) {
 	if len(b) == 0 {
 		return nil, nil, ErrRawQuoteEmpty
 	}
@@ -442,67 +442,79 @@ func decodeDEROIDToString(b []byte) (string, error) {
 // on the envelope fields of a DiceQuote protobuf message. It does not perform
 // cryptographic signature verification or X.509 certificate chain verification.
 func checkDiceQuoteEnvelope(quote *pb.DiceQuote) error {
+	_, _, err := checkAndDecodeDiceQuoteEnvelope(quote)
+	return err
+}
+
+func checkAndDecodeDiceQuoteEnvelope(quote *pb.DiceQuote) ([]byte, cose.ProtectedHeader, error) {
 	if quote == nil {
-		return errDiceQuoteNil
+		return nil, nil, errDiceQuoteNil
 	}
 	if len(quote.GetProtectedHeader()) == 0 {
-		return errDiceProtectedHeaderEmpty
+		return nil, nil, errDiceProtectedHeaderEmpty
 	}
 	if quote.GetAlgorithm() != int64(cose.AlgorithmES384) {
-		return fmt.Errorf("%w: DiceQuote algorithm %d not supported, expected %d", errDiceAlgorithmUnsupported, quote.GetAlgorithm(), int64(cose.AlgorithmES384))
+		return nil, nil, fmt.Errorf("%w: DiceQuote algorithm %d not supported, expected %d", errDiceAlgorithmUnsupported, quote.GetAlgorithm(), int64(cose.AlgorithmES384))
 	}
 	rawProtected, err := diceCBOREncMode.Marshal(quote.GetProtectedHeader())
 	if err != nil {
-		return fmt.Errorf("%w: %v", errDiceProtectedHeaderInvalid, err)
+		return nil, nil, fmt.Errorf("%w: %v", errDiceProtectedHeaderInvalid, err)
 	}
 	var protected cose.ProtectedHeader
 	if err := protected.UnmarshalCBOR(rawProtected); err != nil {
-		return fmt.Errorf("%w: %v", errDiceProtectedHeaderInvalid, err)
+		return nil, nil, fmt.Errorf("%w: %v", errDiceProtectedHeaderInvalid, err)
 	}
 	hdrAlg, err := protected.Algorithm()
 	if err != nil {
-		return fmt.Errorf("%w: %v", errDiceAlgorithmInvalid, err)
+		return nil, nil, fmt.Errorf("%w: %v", errDiceAlgorithmInvalid, err)
 	}
 	if int64(hdrAlg) != quote.GetAlgorithm() {
-		return fmt.Errorf("%w: quote algorithm %d != protected header algorithm %d", errDiceAlgorithmMismatch, quote.GetAlgorithm(), int64(hdrAlg))
+		return nil, nil, fmt.Errorf("%w: quote algorithm %d != protected header algorithm %d", errDiceAlgorithmMismatch, quote.GetAlgorithm(), int64(hdrAlg))
+	}
+	critLabels, err := protected.Critical()
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %v", errDiceProtectedHeaderInvalid, err)
+	}
+	for _, label := range critLabels {
+		if label != cose.HeaderLabelAlgorithm {
+			return nil, nil, fmt.Errorf("%w: %v", errDiceCritLabelUnsupported, label)
+		}
 	}
 	if quote.GetContentType() != "" && quote.GetContentType() != diceContentType {
-		return fmt.Errorf("%w: DiceQuote contentType %q not supported, expected %q", errDiceContentTypeUnsupported, quote.GetContentType(), diceContentType)
+		return nil, nil, fmt.Errorf("%w: DiceQuote contentType %q not supported, expected %q", errDiceContentTypeUnsupported, quote.GetContentType(), diceContentType)
 	}
 	if len(quote.GetCertChain()) == 0 {
-		return errDiceCertChainEmpty
+		return nil, nil, errDiceCertChainEmpty
 	}
 	for i, cert := range quote.GetCertChain() {
 		if len(cert) == 0 {
-			return fmt.Errorf("%w: DiceQuote certChain[%d] is empty", errDiceCertEmpty, i)
+			return nil, nil, fmt.Errorf("%w: DiceQuote certChain[%d] is empty", errDiceCertEmpty, i)
 		}
 	}
 	if len(quote.GetRawPayload()) == 0 {
-		return errDicePayloadEmpty
+		return nil, nil, errDicePayloadEmpty
 	}
 	if quote.GetEatProfile() != diceEatProfileOID {
-		return fmt.Errorf("%w: DiceQuote eatProfile %q not supported, expected %q", errDiceEatProfileUnsupported, quote.GetEatProfile(), diceEatProfileOID)
+		return nil, nil, fmt.Errorf("%w: DiceQuote eatProfile %q not supported, expected %q", errDiceEatProfileUnsupported, quote.GetEatProfile(), diceEatProfileOID)
 	}
 	if quote.GetTdQuoteBody() == nil {
-		return fmt.Errorf("DiceQuote TD Quote Body error: %w", ErrTDQuoteBodyNil)
+		return nil, nil, fmt.Errorf("DiceQuote TD Quote Body error: %w", ErrTDQuoteBodyNil)
 	}
 	if len(quote.GetTdQuoteBody().GetReportData()) != ReportDataSize {
-		return fmt.Errorf("%w: DiceQuote reportData size is %d bytes. Expected %d bytes", errDiceReportDataSize, len(quote.GetTdQuoteBody().GetReportData()), ReportDataSize)
+		return nil, nil, fmt.Errorf("%w: DiceQuote reportData size is %d bytes. Expected %d bytes", errDiceReportDataSize, len(quote.GetTdQuoteBody().GetReportData()), ReportDataSize)
 	}
 	if len(quote.GetSignature()) != diceSignatureSize {
-		return fmt.Errorf("%w: DiceQuote signature size is %d bytes. Expected %d bytes", errDiceSignatureSize, len(quote.GetSignature()), diceSignatureSize)
+		return nil, nil, fmt.Errorf("%w: DiceQuote signature size is %d bytes. Expected %d bytes", errDiceSignatureSize, len(quote.GetSignature()), diceSignatureSize)
 	}
-	return nil
+	return rawProtected, protected, nil
 }
 
-func encodeDiceQuoteCBOR(quote *pb.DiceQuote) ([]byte, error) {
-	if err := checkDiceQuoteEnvelope(quote); err != nil {
-		return nil, fmt.Errorf("DiceQuote invalid: %w", err)
-	}
-
-	rawProtected, err := diceCBOREncMode.Marshal(quote.GetProtectedHeader())
+// DiceQuoteToCOSESign1 validates the envelope fields of a DiceQuote protobuf
+// message and reconstructs its RFC 9052 COSE_Sign1 message.
+func DiceQuoteToCOSESign1(quote *pb.DiceQuote) (*cose.Sign1Message, error) {
+	rawProtected, protected, err := checkAndDecodeDiceQuoteEnvelope(quote)
 	if err != nil {
-		return nil, fmt.Errorf("encoding protected header failed: %w", err)
+		return nil, fmt.Errorf("DiceQuote invalid: %w", err)
 	}
 
 	// DICE quotes encode the certificate chain under COSE header label 32 (x5bag).
@@ -516,13 +528,21 @@ func encodeDiceQuoteCBOR(quote *pb.DiceQuote) ([]byte, error) {
 		unprotected[cose.HeaderLabelContentType] = quote.GetContentType()
 	}
 
-	msg := &cose.Sign1Message{
+	return &cose.Sign1Message{
 		Headers: cose.Headers{
 			RawProtected: rawProtected,
+			Protected:    protected,
 			Unprotected:  unprotected,
 		},
 		Payload:   quote.GetRawPayload(),
 		Signature: quote.GetSignature(),
+	}, nil
+}
+
+func encodeDiceQuoteCBOR(quote *pb.DiceQuote) ([]byte, error) {
+	msg, err := DiceQuoteToCOSESign1(quote)
+	if err != nil {
+		return nil, err
 	}
 	coseBytes, err := msg.MarshalCBOR()
 	if err != nil {
