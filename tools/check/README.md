@@ -22,8 +22,8 @@ This flag provides the path to the quote to check. Stdin is "-".
 The format that input takes. One of
 
 *   `bin`: for a raw binary quote.
-*   `proto`: A binary serialized `tdx.QuoteV4` message.
-*   `textproto`: The `tdx.QuoteV4` message in textproto format.
+*   `proto`: A binary serialized quote message.
+*   `textproto`: The quote message in textproto format.
 
 Default value is `bin`.
 
@@ -79,4 +79,3 @@ $ ./check -in quote.dat -inform bin -get_collateral -check_crl
 *   2: Failure due to quote parsing errors, invalid signatures, certificates or
  collateral mismatch
 *   3: Failure due to an issue with the network or Intel's PCS
-
