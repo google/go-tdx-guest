@@ -37,32 +37,35 @@ type ParseTdxCcelOpts struct {
 	ExtractOpt   extract.Opts
 }
 
-func getRtmrsFromTdQuoteV4(quote *tdxpb.QuoteV4) (*register.RTMRBank, error) {
+// rtmrCount is the number of RTMRs in a TDX quote (V4 and V5).
+const rtmrCount = 4
+
+func rtmrBankFromTdQuote(rtmrs [][]byte) (*register.RTMRBank, error) {
+	if len(rtmrs) != rtmrCount {
+		return nil, fmt.Errorf("unexpected number of RTMRs in quote: got %d, want %d", len(rtmrs), rtmrCount)
+	}
 	bank := register.RTMRBank{}
-	rtmrs := quote.TdQuoteBody.Rtmrs
 	for index, rtmr := range rtmrs {
+		if len(rtmr) != abi.RtmrSize {
+			return nil, fmt.Errorf("RTMR[%d] has unexpected size: got %d bytes, want %d", index, len(rtmr), abi.RtmrSize)
+		}
 		bank.RTMRs = append(bank.RTMRs, register.RTMR{
-			Index:  int(index),
+			Index:  index,
 			Digest: rtmr,
 		})
-		// Tdx Quote V4 has a maximum of 4 RTMRs
-		if index > 3 {
-			return nil, fmt.Errorf("too many RTMRs in quote")
-		}
 	}
 	return &bank, nil
 }
 
 // GetRtmrsFromTdQuote extracts the RTMRs from a TDX attestation quote.
+// Supported quote types are *tdxpb.QuoteV4 and *tdxpb.QuoteV5.
 // It is the caller's responsibility to verify the quote before calling this function.
 func GetRtmrsFromTdQuote(quote interface{}) (*register.RTMRBank, error) {
 	switch q := quote.(type) {
 	case *tdxpb.QuoteV4:
-		rtmrs, err := getRtmrsFromTdQuoteV4(q)
-		if err != nil {
-			return nil, err
-		}
-		return rtmrs, nil
+		return rtmrBankFromTdQuote(q.GetTdQuoteBody().GetRtmrs())
+	case *tdxpb.QuoteV5:
+		return rtmrBankFromTdQuote(q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetRtmrs())
 	default:
 		return nil, fmt.Errorf("unsupported quote type: %T", quote)
 	}
