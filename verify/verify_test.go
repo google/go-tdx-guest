@@ -1225,6 +1225,158 @@ func TestDetermineRelaunchAdvised(t *testing.T) {
 	}
 }
 
+func TestCheckTcbInfoTcbStatusTdxModule(t *testing.T) {
+	const (
+		svnSize = 16
+		// ISVSVNs of the TDX Module Identity TCB levels in the TCB info below.
+		latestModuleSvn = 4
+		olderModuleSvn  = 2
+		// SVN that the TCB level in the TCB info below requires at index 2 of the TDX TCB components.
+		tdxComponentSvn = 3
+	)
+	// newTeeTcbSvn returns a TEE TCB SVN with the given TDX Module ISVSVN (index 0),
+	// TDX Module version (index 1) and TDX TCB component SVN at index 2.
+	newTeeTcbSvn := func(moduleSvn, moduleVersion, componentSvn byte) []byte {
+		svn := make([]byte, svnSize)
+		svn[0], svn[1], svn[2] = moduleSvn, moduleVersion, componentSvn
+		return svn
+	}
+	// The PCK certificate SVNs satisfy the only TCB level in the TCB info below,
+	// so the status of that level is always the matching TCB level status.
+	ext := &pcs.PckExtensions{TCB: pcs.PckCertTCB{CPUSvnComponents: make([]byte, svnSize)}}
+	newTcbInfo := func(tcbLevelStatus, olderModuleStatus pcs.TcbComponentStatus) pcs.TcbInfo {
+		tdxTcbComponents := make([]pcs.TcbComponent, svnSize)
+		tdxTcbComponents[2].Svn = tdxComponentSvn
+		return pcs.TcbInfo{
+			TcbLevels: []pcs.TcbLevel{
+				{
+					Tcb: pcs.Tcb{
+						SgxTcbcomponents: make([]pcs.TcbComponent, svnSize),
+						TdxTcbcomponents: tdxTcbComponents,
+					},
+					TcbStatus: tcbLevelStatus,
+				},
+			},
+			TdxModuleIdentities: []pcs.TdxModuleIdentity{
+				{
+					ID: "TDX_01",
+					TcbLevels: []pcs.TcbLevel{
+						{Tcb: pcs.Tcb{Isvsvn: latestModuleSvn}, TcbStatus: pcs.TcbComponentStatusUpToDate},
+						{Tcb: pcs.Tcb{Isvsvn: olderModuleSvn}, TcbStatus: olderModuleStatus},
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		tdQuoteBody any
+		// tcbLevelStatus is the status of the matching TCB level.
+		tcbLevelStatus pcs.TcbComponentStatus
+		// olderModuleStatus is the status of the TDX Module Identity TCB level with ISVSVN olderModuleSvn.
+		olderModuleStatus pcs.TcbComponentStatus
+		wantErr           string
+	}{
+		{
+			// The TDX Module Identity TCB levels are not consulted when the TDX Module version is 0.
+			name:              "v4_module_version_0",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(0, 0, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           "",
+		},
+		{
+			name:              "v4_module_up_to_date",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           "",
+		},
+		{
+			name:              "v4_module_out_of_date",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(olderModuleSvn, 1, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           ErrTdxTcbStatus.Error(),
+		},
+		{
+			name:              "v4_module_revoked",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(olderModuleSvn, 1, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusRevoked,
+			wantErr:           `TDX Module TCB Status is not "UpToDate", found "Revoked"`,
+		},
+		{
+			name:              "v4_tcb_level_out_of_date",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusOutOfDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           ErrTdxTcbStatus.Error(),
+		},
+		{
+			name:              "v4_tcb_level_revoked",
+			tdQuoteBody:       &pb.TDQuoteBody{TeeTcbSvn: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn)},
+			tcbLevelStatus:    pcs.TcbComponentStatusRevoked,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           `TDX TCB Status is not "UpToDate", found "Revoked"`,
+		},
+		{
+			name: "v5_module_up_to_date",
+			tdQuoteBody: &pb.TDQuoteBodyV5{
+				TeeTcbSvn:  newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn),
+				TeeTcbSvn2: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn),
+			},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           "",
+		},
+		{
+			name: "v5_module_out_of_date_relaunch_advised",
+			tdQuoteBody: &pb.TDQuoteBodyV5{
+				TeeTcbSvn:  newTeeTcbSvn(olderModuleSvn, 1, tdxComponentSvn),
+				TeeTcbSvn2: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn),
+			},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           ErrTcbTdRelaunchAdvised.Error(),
+		},
+		{
+			name: "v5_module_out_of_date_relaunch_not_advised",
+			tdQuoteBody: &pb.TDQuoteBodyV5{
+				TeeTcbSvn: newTeeTcbSvn(olderModuleSvn, 1, tdxComponentSvn),
+				// teeTcbSvn2[2] is lower than the SVN the latest TCB level requires, so a relaunch is not advised.
+				TeeTcbSvn2: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn-1),
+			},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusOutOfDate,
+			wantErr:           ErrTdxTcbStatus.Error(),
+		},
+		{
+			name: "v5_module_revoked",
+			tdQuoteBody: &pb.TDQuoteBodyV5{
+				TeeTcbSvn:  newTeeTcbSvn(olderModuleSvn, 1, tdxComponentSvn),
+				TeeTcbSvn2: newTeeTcbSvn(latestModuleSvn, 1, tdxComponentSvn),
+			},
+			tcbLevelStatus:    pcs.TcbComponentStatusUpToDate,
+			olderModuleStatus: pcs.TcbComponentStatusRevoked,
+			wantErr:           `TDX Module TCB Status is not "UpToDate", found "Revoked"`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotErr string
+			if err := checkTcbInfoTcbStatus(newTcbInfo(tc.tcbLevelStatus, tc.olderModuleStatus), tc.tdQuoteBody, ext); err != nil {
+				gotErr = err.Error()
+			}
+			if gotErr != tc.wantErr {
+				t.Errorf("checkTcbInfoTcbStatus() = %q, want %q", gotErr, tc.wantErr)
+			}
+		})
+	}
+}
+
 var rawTdxQuoteFuncs = map[string]func([]byte, *Options) error{
 	"RawTdxQuote": RawTdxQuote,
 	"RawTdxQuoteContext": func(quote []byte, options *Options) error {
