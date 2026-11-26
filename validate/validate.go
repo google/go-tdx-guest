@@ -17,11 +17,14 @@ package validate
 
 import (
 	"bytes"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 
 	"github.com/google/go-tdx-guest/abi"
+	"github.com/google/go-tdx-guest/pcs"
 	ccpb "github.com/google/go-tdx-guest/proto/checkconfig"
 	pb "github.com/google/go-tdx-guest/proto/tdx"
 	vr "github.com/google/go-tdx-guest/verify"
@@ -337,15 +340,15 @@ func isSvnHigherOrEqual(quoteSvn []byte, optionSvn []byte) bool {
 
 func minVersionCheck(anyQuote any, opts *Options) error {
 	var teeTcbSvn, teeTcbSvn2 []byte
-	var header *pb.Header
+	var signedData *pb.Ecdsa256BitQuoteV4AuthData
 	var isV4 bool
 	switch q := anyQuote.(type) {
 	case *pb.QuoteV4:
-		header = q.GetHeader()
+		signedData = q.GetSignedData()
 		teeTcbSvn = q.GetTdQuoteBody().GetTeeTcbSvn()
 		isV4 = true
 	case *pb.QuoteV5:
-		header = q.GetHeader()
+		signedData = q.GetSignedData()
 		teeTcbSvn = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn()
 		teeTcbSvn2 = q.GetTdQuoteBodyDescriptor().GetTdQuoteBodyV5().GetTeeTcbSvn2()
 	default:
@@ -363,19 +366,27 @@ func minVersionCheck(anyQuote any, opts *Options) error {
 	}
 
 	logger.V(1).Info("Successfully validated TEE TCB security-version number")
-	qeSvn := binary.LittleEndian.Uint16(header.GetQeSvn())
-	pceSvn := binary.LittleEndian.Uint16(header.GetPceSvn())
-	logger.V(2).Infof("QE security-version number is %d, and minimum_qe_svn value is %d", qeSvn, opts.HeaderOptions.MinimumQeSvn)
-	if qeSvn < opts.HeaderOptions.MinimumQeSvn {
-		return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
-			qeSvn, opts.HeaderOptions.MinimumQeSvn)
-	}
-	logger.V(1).Info("Successfully validated QE security-version number")
+	// The TDX quote header does not carry QE/PCE security-version numbers; the
+	// corresponding bytes in the header are reserved and always zero. The real
+	// values are stored in the QE report (ISV SVN) and the PCK leaf certificate
+	// (TCB PCESVN), both of which are part of the quote's signed data.
+	if opts.HeaderOptions.MinimumQeSvn != 0 || opts.HeaderOptions.MinimumPceSvn != 0 {
+		qeSvn, pceSvn, err := qePceSvnFromQuote(signedData)
+		if err != nil {
+			return err
+		}
+		logger.V(2).Infof("QE security-version number is %d, and minimum_qe_svn value is %d", qeSvn, opts.HeaderOptions.MinimumQeSvn)
+		if qeSvn < opts.HeaderOptions.MinimumQeSvn {
+			return fmt.Errorf("QE security-version number %d is less than the required minimum %d",
+				qeSvn, opts.HeaderOptions.MinimumQeSvn)
+		}
+		logger.V(1).Info("Successfully validated QE security-version number")
 
-	logger.V(2).Infof("PCE security-version number is %d, and minimum_pce_svn value is %d", pceSvn, opts.HeaderOptions.MinimumPceSvn)
-	if pceSvn < opts.HeaderOptions.MinimumPceSvn {
-		return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
-			pceSvn, opts.HeaderOptions.MinimumPceSvn)
+		logger.V(2).Infof("PCE security-version number is %d, and minimum_pce_svn value is %d", pceSvn, opts.HeaderOptions.MinimumPceSvn)
+		if pceSvn < opts.HeaderOptions.MinimumPceSvn {
+			return fmt.Errorf("PCE security-version number %d is less than the required minimum %d",
+				pceSvn, opts.HeaderOptions.MinimumPceSvn)
+		}
 	}
 	if isV4 {
 		logger.V(1).Info("Successfully validated PCE security-version number")
@@ -395,6 +406,29 @@ func minVersionCheck(anyQuote any, opts *Options) error {
 	}
 	logger.V(1).Info("Successfully validated TEE TCB SVN2 security-version number")
 	return nil
+}
+
+// qePceSvnFromQuote returns the QE and PCE security-version numbers carried by
+// the quote. The QE SVN is the ISV SVN of the QE report embedded in the quote's
+// signed data, and the PCE SVN is read from the TCB extension of the PCK leaf
+// certificate in the quote's certificate chain.
+func qePceSvnFromQuote(signedData *pb.Ecdsa256BitQuoteV4AuthData) (uint16, uint16, error) {
+	qeSvn := uint16(signedData.GetCertificationData().GetQeReportCertificationData().GetQeReport().GetIsvSvn())
+
+	pckCertChain := signedData.GetCertificationData().GetQeReportCertificationData().GetPckCertificateChainData().GetPckCertChain()
+	pck, _ := pem.Decode(pckCertChain)
+	if pck == nil {
+		return 0, 0, fmt.Errorf("could not decode PCK certificate chain to determine PCE security-version number")
+	}
+	pckCert, err := x509.ParseCertificate(pck.Bytes)
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not parse PCK certificate to determine PCE security-version number: %v", err)
+	}
+	exts, err := pcs.PckCertificateExtensions(pckCert)
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not extract PCE security-version number from PCK certificate: %v", err)
+	}
+	return qeSvn, exts.TCB.PCESvn, nil
 }
 
 func validateXfam(value []byte, fixed1, fixed0 uint64) error {

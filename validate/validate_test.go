@@ -27,9 +27,9 @@ import (
 
 func TestTdxQuoteV5(t *testing.T) {
 
-	// retrieved from quote_sample_v5.
-	qeSvn := uint16(0)
-	pceSvn := uint16(0)
+	// QE and PCE security-version numbers retrieved from quote_sample_v5 (QE report ISV SVN and PCK certificate TCB PCESVN).
+	qeSvn := uint16(7)
+	pceSvn := uint16(13)
 	qeVendorID := []byte{147, 154, 114, 51, 247, 156, 76, 169, 148, 10, 13, 179, 149, 127, 6, 7}
 	teeTcbSvn := []byte{11, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	mrSeam := []byte{123, 240, 99, 40, 14, 148, 251, 5, 31, 93, 215, 177, 252, 89, 206, 154, 172, 66, 187, 150, 29, 248, 212, 75, 112, 156, 155, 15, 248, 122, 123, 77, 246, 72, 101, 123, 166, 209, 24, 149, 137, 254, 171, 29, 90, 60, 154, 157}
@@ -122,20 +122,30 @@ func TestTdxQuoteV5(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumQeSvn: uint16(2),
+					MinimumQeSvn: uint16(8),
 				},
 			},
-			wantErr: "QE security-version number 0 is less than the required minimum 2",
+			wantErr: "QE security-version number 7 is less than the required minimum 8",
 		},
 		{
 			name:  "min Pce security-version check",
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumPceSvn: uint16(2),
+					MinimumPceSvn: uint16(14),
 				},
 			},
-			wantErr: "PCE security-version number 0 is less than the required minimum 2",
+			wantErr: "PCE security-version number 13 is less than the required minimum 14",
+		},
+		{
+			name:  "min QE and PCE security-version check passes",
+			quote: quote12345,
+			opts: &Options{
+				HeaderOptions: HeaderOptions{
+					MinimumQeSvn:  uint16(7),
+					MinimumPceSvn: uint16(13),
+				},
+			},
 		},
 		{
 			name:  "min TEE TCB security-version check",
@@ -341,8 +351,9 @@ func TestTdxQuote(t *testing.T) {
 	if err := TdxQuote(nil, nil); err != vr.ErrOptionsNil {
 		t.Error(err)
 	}
-	qeSvn := uint16(0)
-	pceSvn := uint16(0)
+	// QE and PCE security-version numbers retrieved from quote_sample (QE report ISV SVN and PCK certificate TCB PCESVN).
+	qeSvn := uint16(4)
+	pceSvn := uint16(11)
 	qeVendorID := []byte{0x93, 0x9a, 0x72, 0x33, 0xf7, 0x9c, 0x4c, 0xa9, 0x94, 0xa, 0xd, 0xb3, 0x95, 0x7f, 0x6, 0x7}
 	teeTcbSvn := []byte{0x3, 0x0, 0x4, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}
 	mrSeam := []byte{0x2f, 0xd2, 0x79, 0xc1, 0x61, 0x64, 0xa9, 0x3d, 0xd5, 0xbf, 0x37, 0x3d, 0x83, 0x43, 0x28, 0xd4,
@@ -455,20 +466,30 @@ func TestTdxQuote(t *testing.T) {
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumQeSvn: uint16(2),
+					MinimumQeSvn: uint16(5),
 				},
 			},
-			wantErr: "QE security-version number 0 is less than the required minimum 2",
+			wantErr: "QE security-version number 4 is less than the required minimum 5",
 		},
 		{
 			name:  "min Pce security-version check",
 			quote: quote12345,
 			opts: &Options{
 				HeaderOptions: HeaderOptions{
-					MinimumPceSvn: uint16(2),
+					MinimumPceSvn: uint16(12),
 				},
 			},
-			wantErr: "PCE security-version number 0 is less than the required minimum 2",
+			wantErr: "PCE security-version number 11 is less than the required minimum 12",
+		},
+		{
+			name:  "min QE and PCE security-version check passes",
+			quote: quote12345,
+			opts: &Options{
+				HeaderOptions: HeaderOptions{
+					MinimumQeSvn:  uint16(4),
+					MinimumPceSvn: uint16(11),
+				},
+			},
 		},
 		{
 			name:  "min TEE TCB security-version check",

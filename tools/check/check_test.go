@@ -126,9 +126,8 @@ func testCases() []testCase {
 	return []testCase{
 		{
 			flag: "minimum_qe_svn",
-			good: "0",
+			good: "1",
 			bad: []string{
-				"1",
 				"21",
 				"666666",
 			},
