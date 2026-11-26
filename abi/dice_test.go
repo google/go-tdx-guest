@@ -208,12 +208,9 @@ func TestParseAndEncodeDiceQuoteEnvelope(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			quote, claims, err := parseDiceQuoteEnvelope(tc.rawQuote)
+			quote, err := ParseDiceQuoteEnvelope(tc.rawQuote)
 			if err != nil {
-				t.Fatalf("parseDiceQuoteEnvelope() failed: %v", err)
-			}
-			if len(claims) == 0 {
-				t.Fatalf("parseDiceQuoteEnvelope() returned empty claims map")
+				t.Fatalf("ParseDiceQuoteEnvelope() failed: %v", err)
 			}
 			if err := checkDiceQuoteEnvelope(quote); err != nil {
 				t.Fatalf("checkDiceQuoteEnvelope() failed: %v", err)
@@ -258,16 +255,16 @@ func TestParseAndEncodeDiceQuoteEnvelope(t *testing.T) {
 				t.Errorf("quote.GetSignature() prefix = %x, want prefix %x", quote.GetSignature()[:8], tc.wantSigPrefix)
 			}
 
-			encoded, err := encodeDiceQuoteCBOR(quote)
+			encoded, err := EncodeDiceQuoteCBOR(quote)
 			if err != nil {
-				t.Fatalf("encodeDiceQuoteCBOR() failed: %v", err)
+				t.Fatalf("EncodeDiceQuoteCBOR() failed: %v", err)
 			}
 			if tc.wantExactCBOR && !bytes.Equal(encoded, tc.rawQuote) {
-				t.Errorf("encodeDiceQuoteCBOR() did not produce exact canonical CBOR bytes")
+				t.Errorf("EncodeDiceQuoteCBOR() did not produce exact canonical CBOR bytes")
 			}
-			reparsed, _, err := parseDiceQuoteEnvelope(encoded)
+			reparsed, err := ParseDiceQuoteEnvelope(encoded)
 			if err != nil {
-				t.Fatalf("parseDiceQuoteEnvelope(encoded) failed: %v", err)
+				t.Fatalf("ParseDiceQuoteEnvelope(encoded) failed: %v", err)
 			}
 			if !proto.Equal(quote, reparsed) {
 				t.Errorf("reparsed DiceQuote does not match original")
@@ -277,9 +274,9 @@ func TestParseAndEncodeDiceQuoteEnvelope(t *testing.T) {
 }
 
 func TestCheckAndEncodeDiceQuoteEnvelopeNegative(t *testing.T) {
-	baseQuote, _, err := parseDiceQuoteEnvelope(test.RawQuoteDICE)
+	baseQuote, err := ParseDiceQuoteEnvelope(test.RawQuoteDICE)
 	if err != nil {
-		t.Fatalf("parseDiceQuoteEnvelope(RawQuoteDICE) failed: %v", err)
+		t.Fatalf("ParseDiceQuoteEnvelope(RawQuoteDICE) failed: %v", err)
 	}
 
 	mutate := func(fn func(*pb.DiceQuote)) *pb.DiceQuote {
@@ -299,6 +296,21 @@ func TestCheckAndEncodeDiceQuoteEnvelopeNegative(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("failed to marshal protected header without algorithm: %v", err)
+	}
+	unsupportedCritProtectedBytes, err := diceCBOREncMode.Marshal(map[any]any{
+		cose.HeaderLabelAlgorithm: cose.AlgorithmES384,
+		cose.HeaderLabelCritical:  []any{cose.HeaderLabelKeyID},
+		cose.HeaderLabelKeyID:     []byte{0x01},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal protected header with unsupported crit label: %v", err)
+	}
+	missingCritTargetProtectedBytes, err := diceCBOREncMode.Marshal(map[any]any{
+		cose.HeaderLabelAlgorithm: cose.AlgorithmES384,
+		cose.HeaderLabelCritical:  []any{cose.HeaderLabelKeyID},
+	})
+	if err != nil {
+		t.Fatalf("failed to marshal protected header with missing crit target: %v", err)
 	}
 
 	tcs := []struct {
@@ -337,6 +349,16 @@ func TestCheckAndEncodeDiceQuoteEnvelopeNegative(t *testing.T) {
 			wantErr: errDiceAlgorithmMismatch,
 		},
 		{
+			name:    "unsupported crit label in protected header",
+			quote:   mutate(func(q *pb.DiceQuote) { q.ProtectedHeader = unsupportedCritProtectedBytes }),
+			wantErr: errDiceCritLabelUnsupported,
+		},
+		{
+			name:    "missing crit target header in protected header",
+			quote:   mutate(func(q *pb.DiceQuote) { q.ProtectedHeader = missingCritTargetProtectedBytes }),
+			wantErr: errDiceProtectedHeaderInvalid,
+		},
+		{
 			name:    "unsupported content type",
 			quote:   mutate(func(q *pb.DiceQuote) { q.ContentType = "application/json" }),
 			wantErr: errDiceContentTypeUnsupported,
@@ -355,6 +377,11 @@ func TestCheckAndEncodeDiceQuoteEnvelopeNegative(t *testing.T) {
 			name:    "empty raw payload",
 			quote:   mutate(func(q *pb.DiceQuote) { q.RawPayload = nil }),
 			wantErr: errDicePayloadEmpty,
+		},
+		{
+			name:    "non-map raw payload",
+			quote:   mutate(func(q *pb.DiceQuote) { q.RawPayload = []byte{0x01} }),
+			wantErr: errDicePayloadNotMap,
 		},
 		{
 			name:    "invalid eat profile",
@@ -376,12 +403,33 @@ func TestCheckAndEncodeDiceQuoteEnvelopeNegative(t *testing.T) {
 			quote:   mutate(func(q *pb.DiceQuote) { q.Signature = []byte{0x01, 0x02} }),
 			wantErr: errDiceSignatureSize,
 		},
+		{
+			name:    "report_data mismatch with raw_payload",
+			quote:   mutate(func(q *pb.DiceQuote) { q.TdQuoteBody.ReportData[0] ^= 0xff }),
+			wantErr: errDicePayloadMismatch,
+		},
+		{
+			name:    "issuer mismatch with raw_payload",
+			quote:   mutate(func(q *pb.DiceQuote) { q.Issuer = "Forged Issuer" }),
+			wantErr: errDicePayloadMismatch,
+		},
+		{
+			name:    "subject mismatch with raw_payload",
+			quote:   mutate(func(q *pb.DiceQuote) { q.Subject = "Forged Subject" }),
+			wantErr: errDicePayloadMismatch,
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := encodeDiceQuoteCBOR(tc.quote); !errors.Is(err, tc.wantErr) {
-				t.Errorf("encodeDiceQuoteCBOR() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
+			if err := checkDiceQuoteEnvelope(tc.quote); !errors.Is(err, tc.wantErr) {
+				t.Errorf("checkDiceQuoteEnvelope() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
+			}
+			if _, err := DiceQuoteToCOSESign1(tc.quote); !errors.Is(err, tc.wantErr) {
+				t.Errorf("DiceQuoteToCOSESign1() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
+			}
+			if _, err := EncodeDiceQuoteCBOR(tc.quote); !errors.Is(err, tc.wantErr) {
+				t.Errorf("EncodeDiceQuoteCBOR() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
 			}
 		})
 	}
@@ -730,15 +778,15 @@ func TestParseDiceQuoteEnvelopeNegative(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			_, _, err := parseDiceQuoteEnvelope(tc.raw)
+			_, err := ParseDiceQuoteEnvelope(tc.raw)
 			if err == nil {
-				t.Fatalf("parseDiceQuoteEnvelope() succeeded, want error")
+				t.Fatalf("ParseDiceQuoteEnvelope() succeeded, want error")
 			}
 			if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
-				t.Errorf("parseDiceQuoteEnvelope() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
+				t.Errorf("ParseDiceQuoteEnvelope() error = %v, want errors.Is(_, %v)", err, tc.wantErr)
 			}
 			if tc.wantErrSub != "" && !strings.Contains(err.Error(), tc.wantErrSub) {
-				t.Errorf("parseDiceQuoteEnvelope() error = %v, want substring %q", err, tc.wantErrSub)
+				t.Errorf("ParseDiceQuoteEnvelope() error = %v, want substring %q", err, tc.wantErrSub)
 			}
 		})
 	}
